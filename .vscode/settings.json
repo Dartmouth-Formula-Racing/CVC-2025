@@ -1,0 +1,30 @@
+{
+    "files.associations": {
+        "*.c": "c",
+        "main.h": "c",
+        "stm32f4xx_hal.h": "c",
+        "core_adc.h": "c",
+        "statemachine.h": "c",
+        "cmsis_os.h": "c",
+        "tasks.h": "c",
+        "semphr.h": "c",
+        "stdbool.h": "c",
+        "throttle.h": "c",
+        "analogs.h": "c",
+        "core_rtc.h": "c",
+        "torque.h": "c",
+        "core_can.h": "c",
+        "freertos.h": "c",
+        "can.h": "c",
+        "stddef.h": "c",
+        "type_traits": "c",
+        "stm32f4xx_hal_can.h": "c",
+        "queue.h": "c",
+        "task.h": "c",
+        "cmsis_os2.h": "c",
+        "parse.h": "c",
+        "misc.h": "c",
+        "data.h": "c",
+        "wheelspeeds.h": "c"
+    }
+}

@@ -17,11 +17,19 @@
  */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
+#include <cmsis_os.h>
+#include <main.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <analogs.h>
+#include <can.h>
+#include <data.h>
+#include <misc.h>
+#include <statemachine.h>
+#include <throttle.h>
+#include <torque.h>
+#include <wheelspeeds.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,10 +49,11 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
-DMA_HandleTypeDef hdma_adc1;
 
 CAN_HandleTypeDef hcan1;
 CAN_HandleTypeDef hcan2;
+
+CRC_HandleTypeDef hcrc;
 
 RTC_HandleTypeDef hrtc;
 
@@ -56,7 +65,7 @@ TIM_HandleTypeDef htim9;
 TIM_HandleTypeDef htim10;
 TIM_HandleTypeDef htim11;
 TIM_HandleTypeDef htim12;
-
+TIM_HandleTypeDef htim14;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -64,12 +73,10 @@ TIM_HandleTypeDef htim12;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_CAN2_Init(void);
 static void MX_RTC_Init(void);
 static void MX_ADC1_Init(void);
-static void MX_TIM1_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
@@ -77,6 +84,12 @@ static void MX_TIM12_Init(void);
 static void MX_TIM10_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_TIM9_Init(void);
+static void MX_CRC_Init(void);
+static void MX_TIM1_Init(void);
+static void MX_TIM14_Init(void);
+void configureTimerForRunTimeStats(void);
+unsigned long getRunTimeCounterValue(void);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -113,12 +126,10 @@ int main(void) {
 
     /* Initialize all configured peripherals */
     MX_GPIO_Init();
-    MX_DMA_Init();
     MX_CAN1_Init();
     MX_CAN2_Init();
     MX_RTC_Init();
     MX_ADC1_Init();
-    MX_TIM1_Init();
     MX_TIM3_Init();
     MX_TIM4_Init();
     MX_TIM8_Init();
@@ -126,9 +137,31 @@ int main(void) {
     MX_TIM10_Init();
     MX_TIM11_Init();
     MX_TIM9_Init();
+    MX_CRC_Init();
+    MX_TIM1_Init();
+    MX_TIM14_Init();
     /* USER CODE BEGIN 2 */
 
     /* USER CODE END 2 */
+
+    /* Init scheduler */
+    osKernelInitialize();
+
+    /* USER CODE BEGIN RTOS_THREADS */
+    Analogs_Init();
+    CAN_Init();
+    Data_Init();
+    Misc_Init();
+    StateMachine_Init();
+    Throttle_Init();
+    Torque_Init();
+    // WheelSpeeds_Init();
+    /* USER CODE END RTOS_THREADS */
+
+    /* Start scheduler */
+    osKernelStart();
+
+    /* We should never get here as control is now taken by the scheduler */
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
@@ -156,9 +189,9 @@ void SystemClock_Config(void) {
     /** Initializes the RCC Oscillators according to the specified parameters
      * in the RCC_OscInitTypeDef structure.
      */
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI | RCC_OSCILLATORTYPE_HSE;
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE | RCC_OSCILLATORTYPE_LSE;
     RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
-    RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+    RCC_OscInitStruct.LSEState = RCC_LSE_BYPASS;
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
     RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
     RCC_OscInitStruct.PLL.PLLM = 6;
@@ -201,16 +234,16 @@ static void MX_ADC1_Init(void) {
     /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
      */
     hadc1.Instance = ADC1;
-    hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+    hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV8;
     hadc1.Init.Resolution = ADC_RESOLUTION_12B;
     hadc1.Init.ScanConvMode = ENABLE;
-    hadc1.Init.ContinuousConvMode = ENABLE;
+    hadc1.Init.ContinuousConvMode = DISABLE;
     hadc1.Init.DiscontinuousConvMode = DISABLE;
     hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
     hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
     hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-    hadc1.Init.NbrOfConversion = 11;
-    hadc1.Init.DMAContinuousRequests = ENABLE;
+    hadc1.Init.NbrOfConversion = 12;
+    hadc1.Init.DMAContinuousRequests = DISABLE;
     hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
     if (HAL_ADC_Init(&hadc1) != HAL_OK) {
         Error_Handler();
@@ -235,7 +268,7 @@ static void MX_ADC1_Init(void) {
 
     /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
      */
-    sConfig.Channel = ADC_CHANNEL_11;
+    sConfig.Channel = ADC_CHANNEL_3;
     sConfig.Rank = 3;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
         Error_Handler();
@@ -243,7 +276,7 @@ static void MX_ADC1_Init(void) {
 
     /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
      */
-    sConfig.Channel = ADC_CHANNEL_3;
+    sConfig.Channel = ADC_CHANNEL_4;
     sConfig.Rank = 4;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
         Error_Handler();
@@ -251,7 +284,7 @@ static void MX_ADC1_Init(void) {
 
     /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
      */
-    sConfig.Channel = ADC_CHANNEL_4;
+    sConfig.Channel = ADC_CHANNEL_5;
     sConfig.Rank = 5;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
         Error_Handler();
@@ -259,7 +292,7 @@ static void MX_ADC1_Init(void) {
 
     /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
      */
-    sConfig.Channel = ADC_CHANNEL_5;
+    sConfig.Channel = ADC_CHANNEL_6;
     sConfig.Rank = 6;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
         Error_Handler();
@@ -267,7 +300,7 @@ static void MX_ADC1_Init(void) {
 
     /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
      */
-    sConfig.Channel = ADC_CHANNEL_6;
+    sConfig.Channel = ADC_CHANNEL_7;
     sConfig.Rank = 7;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
         Error_Handler();
@@ -275,7 +308,7 @@ static void MX_ADC1_Init(void) {
 
     /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
      */
-    sConfig.Channel = ADC_CHANNEL_7;
+    sConfig.Channel = ADC_CHANNEL_8;
     sConfig.Rank = 8;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
         Error_Handler();
@@ -283,7 +316,7 @@ static void MX_ADC1_Init(void) {
 
     /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
      */
-    sConfig.Channel = ADC_CHANNEL_8;
+    sConfig.Channel = ADC_CHANNEL_9;
     sConfig.Rank = 9;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
         Error_Handler();
@@ -291,7 +324,7 @@ static void MX_ADC1_Init(void) {
 
     /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
      */
-    sConfig.Channel = ADC_CHANNEL_9;
+    sConfig.Channel = ADC_CHANNEL_10;
     sConfig.Rank = 10;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
         Error_Handler();
@@ -299,8 +332,16 @@ static void MX_ADC1_Init(void) {
 
     /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
      */
-    sConfig.Channel = ADC_CHANNEL_10;
+    sConfig.Channel = ADC_CHANNEL_11;
     sConfig.Rank = 11;
+    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+        Error_Handler();
+    }
+
+    /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+     */
+    sConfig.Channel = ADC_CHANNEL_12;
+    sConfig.Rank = 12;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
         Error_Handler();
     }
@@ -415,6 +456,28 @@ static void MX_CAN2_Init(void) {
         Error_Handler();
     }
     /* USER CODE END CAN2_Init 2 */
+}
+
+/**
+ * @brief CRC Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_CRC_Init(void) {
+    /* USER CODE BEGIN CRC_Init 0 */
+
+    /* USER CODE END CRC_Init 0 */
+
+    /* USER CODE BEGIN CRC_Init 1 */
+
+    /* USER CODE END CRC_Init 1 */
+    hcrc.Instance = CRC;
+    if (HAL_CRC_Init(&hcrc) != HAL_OK) {
+        Error_Handler();
+    }
+    /* USER CODE BEGIN CRC_Init 2 */
+
+    /* USER CODE END CRC_Init 2 */
 }
 
 /**
@@ -799,16 +862,30 @@ static void MX_TIM12_Init(void) {
 }
 
 /**
- * Enable DMA controller clock
+ * @brief TIM14 Initialization Function
+ * @param None
+ * @retval None
  */
-static void MX_DMA_Init(void) {
-    /* DMA controller clock enable */
-    __HAL_RCC_DMA2_CLK_ENABLE();
+static void MX_TIM14_Init(void) {
+    /* USER CODE BEGIN TIM14_Init 0 */
 
-    /* DMA interrupt init */
-    /* DMA2_Stream0_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+    /* USER CODE END TIM14_Init 0 */
+
+    /* USER CODE BEGIN TIM14_Init 1 */
+
+    /* USER CODE END TIM14_Init 1 */
+    htim14.Instance = TIM14;
+    htim14.Init.Prescaler = 0;
+    htim14.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim14.Init.Period = 65535;
+    htim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    htim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+    if (HAL_TIM_Base_Init(&htim14) != HAL_OK) {
+        Error_Handler();
+    }
+    /* USER CODE BEGIN TIM14_Init 2 */
+
+    /* USER CODE END TIM14_Init 2 */
 }
 
 /**
@@ -819,6 +896,7 @@ static void MX_DMA_Init(void) {
 static void MX_GPIO_Init(void) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     /* USER CODE BEGIN MX_GPIO_Init_1 */
+
     /* USER CODE END MX_GPIO_Init_1 */
 
     /* GPIO Ports Clock Enable */
@@ -828,40 +906,104 @@ static void MX_GPIO_Init(void) {
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
 
-    /*Configure GPIO pins : PC13 PC2 PC3 PC4
-                             PC5 PC7 PC8 PC9
-                             PC10 PC11 PC12 */
-    GPIO_InitStruct.Pin = GPIO_PIN_13 | GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_10 | GPIO_PIN_11 | GPIO_PIN_12;
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    /*Configure GPIO pin Output Level */
+    HAL_GPIO_WritePin(GPIOC, Reverse_LED_Pin | Left_Inverter_Enable_Pin | Drive_LED_Pin | Neutral_LED_Pin, GPIO_PIN_RESET);
+
+    /*Configure GPIO pin Output Level */
+    HAL_GPIO_WritePin(GPO_12V_Control_GPIO_Port, GPO_12V_Control_Pin, GPIO_PIN_RESET);
+
+    /*Configure GPIO pin Output Level */
+    HAL_GPIO_WritePin(GPIOA, Buzzer_Pin | Brake_Light_Pin, GPIO_PIN_RESET);
+
+    /*Configure GPIO pin Output Level */
+    HAL_GPIO_WritePin(Right_Inverter_Enable_GPIO_Port, Right_Inverter_Enable_Pin, GPIO_PIN_RESET);
+
+    /*Configure GPIO pins : Reverse_LED_Pin Left_Inverter_Enable_Pin Drive_LED_Pin Neutral_LED_Pin */
+    GPIO_InitStruct.Pin = Reverse_LED_Pin | Left_Inverter_Enable_Pin | Drive_LED_Pin | Neutral_LED_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : MCU_IMD_OK_Pin MCU_BSPD_OK_Pin MCU_BSPD_Instant_Pin */
+    GPIO_InitStruct.Pin = MCU_IMD_OK_Pin | MCU_BSPD_OK_Pin | MCU_BSPD_Instant_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    /*Configure GPIO pins : PB2 PB10 PB11 PB15
-                             PB5 PB7 */
-    GPIO_InitStruct.Pin = GPIO_PIN_2 | GPIO_PIN_10 | GPIO_PIN_11 | GPIO_PIN_15 | GPIO_PIN_5 | GPIO_PIN_7;
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    /*Configure GPIO pins : MCU_Contactor_1_Closed_Pin MCU_12V_GPI_Pin MCU_Contactor_2_Closed_Pin MCU_SDC_Pin */
+    GPIO_InitStruct.Pin = MCU_Contactor_1_Closed_Pin | MCU_12V_GPI_Pin | MCU_Contactor_2_Closed_Pin | MCU_SDC_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /*Configure GPIO pins : PA9 PA10 PA15 */
-    GPIO_InitStruct.Pin = GPIO_PIN_9 | GPIO_PIN_10 | GPIO_PIN_15;
+    /*Configure GPIO pin : MCU_GPIO_Pin */
+    GPIO_InitStruct.Pin = MCU_GPIO_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(MCU_GPIO_GPIO_Port, &GPIO_InitStruct);
+
+    /*Configure GPIO pin : GPO_12V_Control_Pin */
+    GPIO_InitStruct.Pin = GPO_12V_Control_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPO_12V_Control_GPIO_Port, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : Drive_Button_Pin Neutral_Button_Pin Reverse_Button_Pin */
+    GPIO_InitStruct.Pin = Drive_Button_Pin | Neutral_Button_Pin | Reverse_Button_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    /*Configure GPIO pin : MCU_BMS_OK_Pin */
+    GPIO_InitStruct.Pin = MCU_BMS_OK_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(MCU_BMS_OK_GPIO_Port, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : Buzzer_Pin Brake_Light_Pin */
+    GPIO_InitStruct.Pin = Buzzer_Pin | Brake_Light_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    /*Configure GPIO pin : PD2 */
-    GPIO_InitStruct.Pin = GPIO_PIN_2;
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    /*Configure GPIO pin : Right_Inverter_Enable_Pin */
+    GPIO_InitStruct.Pin = Right_Inverter_Enable_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(Right_Inverter_Enable_GPIO_Port, &GPIO_InitStruct);
 
     /* USER CODE BEGIN MX_GPIO_Init_2 */
+
     /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
+/**
+ * @brief  Period elapsed callback in non blocking mode
+ * @note   This function is called  when TIM2 interrupt took place, inside
+ * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+ * a global variable "uwTick" used as application time base.
+ * @param  htim : TIM handle
+ * @retval None
+ */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+    /* USER CODE BEGIN Callback 0 */
+
+    /* USER CODE END Callback 0 */
+    if (htim->Instance == TIM2) {
+        HAL_IncTick();
+    }
+    /* USER CODE BEGIN Callback 1 */
+
+    /* USER CODE END Callback 1 */
+}
 
 /**
  * @brief  This function is executed in case of error occurrence.
@@ -875,6 +1017,20 @@ void Error_Handler(void) {
     }
     /* USER CODE END Error_Handler_Debug */
 }
+
+/**
+ * @brief  Configures FreeRTOS run-time statistics timer.
+ * @retval None
+ */
+__weak void configureTimerForRunTimeStats(void) { HAL_TIM_Base_Start_IT(&htim14); }
+
+extern volatile unsigned long ulHighFrequencyTimerTicks;
+
+/**
+ * @brief  Returns the current value of the run-time counter.
+ * @retval The current value of the run-time counter.
+ */
+__weak unsigned long getRunTimeCounterValue(void) { return ulHighFrequencyTimerTicks; }
 
 #ifdef USE_FULL_ASSERT
 /**
