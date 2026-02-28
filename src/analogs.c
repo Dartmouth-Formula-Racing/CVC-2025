@@ -62,7 +62,6 @@ void Analogs_Init(void) {
         Error_Handler();
     }
     // HAL_ADC_Start_IT(&hadc1);
-    HAL_ADC_Start(&hadc1);  // Start ADC in polling mode, can be changed to DMA if needed
 }
 
 void Analogs_Read_Task(void *arguments) {
@@ -70,6 +69,7 @@ void Analogs_Read_Task(void *arguments) {
         if (xSemaphoreTake(analogMutex, portMAX_DELAY) == pdTRUE) {
             for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
                 // Start ADC conversion for each channel
+                HAL_ADC_Start(&hadc1);
                 HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
                 buffer[i] = HAL_ADC_GetValue(&hadc1) & 0x0FFF;
             }

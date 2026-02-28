@@ -26,9 +26,13 @@ static StackType_t torqueCalculateTaskStack[TORQUE_CALCULATE_TASK_STACK_SIZE];
 static StaticTask_t torqueCalculateTaskTCB;
 static StackType_t torqueCommandTaskStack[TORQUE_COMMAND_TASK_STACK_SIZE];
 static StaticTask_t torqueCommandTaskTCB;
+static StackType_t torqueLimitTaskStack[TORQUE_LIMIT_TASK_STACK_SIZE];
+static StaticTask_t torqueLimitTaskTCB;
 
+void Torque_LimitInverters(void);
 void Torque_CalculateTask(void* arguments);
 void Torque_CommandTask(void* arguments);
+void Torque_LimitTask(void* arguments);
 int Error_Handler(void);
 
 void Torque_Init(void) {
@@ -39,6 +43,12 @@ void Torque_Init(void) {
     }
     handle = xTaskCreateStatic(Torque_CommandTask, TORQUE_COMMAND_TASK_NAME, TORQUE_COMMAND_TASK_STACK_SIZE, NULL, TORQUE_COMMAND_TASK_PRIORITY,
                                torqueCommandTaskStack, &torqueCommandTaskTCB);
+    if (handle == NULL) {
+        Error_Handler();
+    }
+
+    handle = xTaskCreateStatic(Torque_LimitTask, TORQUE_LIMIT_TASK_NAME, TORQUE_LIMIT_TASK_STACK_SIZE, NULL, TORQUE_LIMIT_TASK_PRIORITY,
+                               torqueLimitTaskStack, &torqueLimitTaskTCB);
     if (handle == NULL) {
         Error_Handler();
     }
@@ -142,11 +152,20 @@ void Torque_CommandTask(void* arguments) {
     }
 }
 
+void Torque_LimitTask(void* arguments) {
+    TickType_t lastWakeTime = xTaskGetTickCount();
+    while (1) {
+        Torque_LimitInverters();
+        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(TORQUE_LIMIT_TASK_INTERVAL));
+    }
+}
+
 void Torque_LimitInverters(void) {
     // Cascadia CAN protocol 6.3 section 2.5
     // Limit discharge and charge current using message 0x202
     // Bytes [0, 1] - Discharge current limit (A)
     // Bytes [2, 3] - Charge current limit (A)
+    // Does not include traction control or torque vectoring yet, assumes even power split
     float busVoltage = (float)BMSDataGet(BMS_TOTAL_VOLTAGE).data / 100.0f;
 
     float maxDischarge = (MAX_POWER * 1000.0f / busVoltage) / 2;
@@ -164,22 +183,41 @@ void Torque_LimitInverters(void) {
         maxDischarge = maxBSPD;
     }
 
-    CAN_Frame frame = {0};
-    frame.header.tx.StdId = 0x202;
-    frame.header.tx.ExtId = 0x202;
-    frame.header.tx.IDE = CAN_ID_STD;
-    frame.header.tx.RTR = CAN_RTR_DATA;
-    frame.header.tx.DLC = 8;
-    frame.data[0] = (uint8_t)((uint16_t)maxDischarge & 0xFF);
-    frame.data[1] = (uint8_t)(((uint16_t)maxDischarge >> 8) & 0xFF);
-    frame.data[2] = (uint8_t)((uint16_t)maxCharge & 0xFF);
-    frame.data[3] = (uint8_t)(((uint16_t)maxCharge >> 8) & 0xFF);
-    frame.data[4] = 0;
-    frame.data[5] = 0;
-    frame.data[6] = 0;
-    frame.data[7] = 0;
+    CAN_Frame RLFrame = {0};
+    CAN_Frame RRFrame = {0};
 
-    CAN_SendFrame(BUS1, &frame);
+    RLFrame.header.tx.StdId = InverterRL_STD(0x02);
+    RLFrame.header.tx.ExtId = InverterRL_EXT(0x02);
+    RLFrame.header.tx.IDE = CAN_ID_STD;
+    RLFrame.header.tx.RTR = CAN_RTR_DATA;
+    RLFrame.header.tx.DLC = 8;
+
+    RRFrame.header.tx.StdId = InverterRR_STD(0x02);
+    RRFrame.header.tx.ExtId = InverterRR_EXT(0x02);
+    RRFrame.header.tx.IDE = CAN_ID_STD;
+    RRFrame.header.tx.RTR = CAN_RTR_DATA;
+    RRFrame.header.tx.DLC = 8;
+
+    RLFrame.data[0] = (uint8_t)((uint16_t)maxDischarge & 0xFF);
+    RLFrame.data[1] = (uint8_t)(((uint16_t)maxDischarge >> 8) & 0xFF);
+    RLFrame.data[2] = (uint8_t)((uint16_t)maxCharge & 0xFF);
+    RLFrame.data[3] = (uint8_t)(((uint16_t)maxCharge >> 8) & 0xFF);
+    RLFrame.data[4] = 0;
+    RLFrame.data[5] = 0;
+    RLFrame.data[6] = 0;
+    RLFrame.data[7] = 0;
+
+    RRFrame.data[0] = (uint8_t)((uint16_t)maxDischarge & 0xFF);
+    RRFrame.data[1] = (uint8_t)(((uint16_t)maxDischarge >> 8) & 0xFF);
+    RRFrame.data[2] = (uint8_t)((uint16_t)maxCharge & 0xFF);
+    RRFrame.data[3] = (uint8_t)(((uint16_t)maxCharge >> 8) & 0xFF);
+    RRFrame.data[4] = 0;
+    RRFrame.data[5] = 0;
+    RRFrame.data[6] = 0;
+    RRFrame.data[7] = 0;
+
+    CAN_SendFrame(BUS1, &RLFrame);
+    CAN_SendFrame(BUS1, &RRFrame);
 }
 
 float Torque_RearLeft(void) { return torqueRearLeft; }

@@ -178,7 +178,7 @@ void Dashboard_Broadcast_Task(void* arguments) {
         frame.data[4] = (uint8_t)StateMachine_GetDriveState();
         frame.data[5] = (uint8_t)StateMachine_GetState();
         frame.data[6] = 0;
-        CAN_SendFrame(BUS2, &frame);
+        CAN_SendFrame(BUS1, &frame);
 
         frame.header.tx.StdId = Dashboard_STD(1);
         frame.header.tx.IDE = CAN_ID_STD;
@@ -198,7 +198,7 @@ void Dashboard_Broadcast_Task(void* arguments) {
         frame.data[5] = efficiency & 0xFF;
         frame.data[6] = (odometer >> 8) & 0xFF;
         frame.data[7] = odometer & 0xFF;
-        CAN_SendFrame(BUS2, &frame);
+        CAN_SendFrame(BUS1, &frame);
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(DASHBOARD_BROADCAST_TASK_INTERVAL));
     }
