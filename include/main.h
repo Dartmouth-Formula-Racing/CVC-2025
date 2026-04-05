@@ -59,7 +59,7 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define Reverse_LED_Pin GPIO_PIN_13
+#define Reverse_LED_Pin GPIO_PIN_11
 #define Reverse_LED_GPIO_Port GPIOC
 #define DCDC_Voltage_Pin GPIO_PIN_0
 #define DCDC_Voltage_GPIO_Port GPIOC
@@ -107,7 +107,7 @@ void Error_Handler(void);
 #define Wheel_Speed_RR_GPIO_Port GPIOC
 #define Left_Inverter_Enable_Pin GPIO_PIN_7
 #define Left_Inverter_Enable_GPIO_Port GPIOC
-#define Drive_Button_Pin GPIO_PIN_8
+#define Drive_Button_Pin GPIO_PIN_10
 #define Drive_Button_GPIO_Port GPIOC
 #define Neutral_Button_Pin GPIO_PIN_9
 #define Neutral_Button_GPIO_Port GPIOC
@@ -119,9 +119,9 @@ void Error_Handler(void);
 #define Buzzer_GPIO_Port GPIOA
 #define Brake_Light_Pin GPIO_PIN_15
 #define Brake_Light_GPIO_Port GPIOA
-#define Reverse_Button_Pin GPIO_PIN_10
+#define Reverse_Button_Pin GPIO_PIN_8
 #define Reverse_Button_GPIO_Port GPIOC
-#define Drive_LED_Pin GPIO_PIN_11
+#define Drive_LED_Pin GPIO_PIN_13
 #define Drive_LED_GPIO_Port GPIOC
 #define Neutral_LED_Pin GPIO_PIN_12
 #define Neutral_LED_GPIO_Port GPIOC

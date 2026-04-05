@@ -183,6 +183,33 @@ void StateMachine_Task(void* arguments) {
                 driveLockout = true;
                 break;
         }
+        
+        // DO NOT UNCOMMENT THIS UNLESS YOU WANT TO CHANGE DRIVE STATE WITH NO CHECK!!!!
+        // if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
+        //     driveState = NEUTRAL;
+        // } else if (HAL_GPIO_ReadPin(Drive_Button_GPIO_Port, Drive_Button_Pin) == GPIO_PIN_RESET) {
+        //     driveState = DRIVE;
+        // } else if (HAL_GPIO_ReadPin(Reverse_Button_GPIO_Port, Reverse_Button_Pin) == GPIO_PIN_RESET) {
+        //     if (ALLOW_REVERSE) {
+        //         driveState = REVERSE;
+        //     } else {
+        //         driveState = DRIVE;
+        //     }
+        // }
+
+        if (driveState == DRIVE) {
+            HAL_GPIO_WritePin(Drive_LED_GPIO_Port, Drive_LED_Pin, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(Neutral_LED_GPIO_Port, Neutral_LED_Pin, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(Reverse_LED_GPIO_Port, Reverse_LED_Pin, GPIO_PIN_RESET);
+        } else if (driveState == NEUTRAL) {
+            HAL_GPIO_WritePin(Drive_LED_GPIO_Port, Drive_LED_Pin, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(Neutral_LED_GPIO_Port, Neutral_LED_Pin, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(Reverse_LED_GPIO_Port, Reverse_LED_Pin, GPIO_PIN_RESET);
+        } else if (driveState == REVERSE) {
+            HAL_GPIO_WritePin(Drive_LED_GPIO_Port, Drive_LED_Pin, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(Neutral_LED_GPIO_Port, Neutral_LED_Pin, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(Reverse_LED_GPIO_Port, Reverse_LED_Pin, GPIO_PIN_SET);
+        }
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(STATEMACHINE_TASK_INTERVAL));
     }

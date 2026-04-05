@@ -58,7 +58,7 @@ void Torque_CalculateTask(void* arguments) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     while (1) {
         float throttleValue = Throttle_GetValue();
-        uint16_t steeringAngleADC = Analogs_ReadChannel(Steering_Angle);
+        volatile uint16_t steeringAngleADC = Analogs_ReadChannel(Steering_Angle);
         steeringAngleADC = steeringAngleADC < STEERING_LEFT_LIMIT ? STEERING_LEFT_LIMIT : steeringAngleADC;
         steeringAngleADC = steeringAngleADC > STEERING_RIGHT_LIMIT ? STEERING_RIGHT_LIMIT : steeringAngleADC;
         float steeringAngle = 2.0f * (float)(steeringAngleADC - STEERING_LEFT_LIMIT) / (STEERING_RIGHT_LIMIT - STEERING_LEFT_LIMIT) - 1.0f;
@@ -75,12 +75,12 @@ void Torque_CalculateTask(void* arguments) {
             torqueFrontRight *= REVERSE_TORQUE_LIMIT;
         }
 
-        if (steeringAngle < 0.0f) {
-            torqueRearLeft += TORQUE_VECTORING_GAIN * steeringAngle * torqueRearLeft;
-            torqueFrontLeft += TORQUE_VECTORING_GAIN * steeringAngle * torqueFrontLeft;
+        if (steeringAngle > 0.0f) {
+            torqueRearLeft -= TORQUE_VECTORING_GAIN * steeringAngle * torqueRearLeft;
+            torqueFrontLeft -= TORQUE_VECTORING_GAIN * steeringAngle * torqueFrontLeft;
         } else {
-            torqueRearRight += TORQUE_VECTORING_GAIN * steeringAngle * torqueRearRight;
-            torqueFrontRight += TORQUE_VECTORING_GAIN * steeringAngle * torqueFrontRight;
+            torqueRearRight -= TORQUE_VECTORING_GAIN * steeringAngle * torqueRearRight;
+            torqueFrontRight -= TORQUE_VECTORING_GAIN * steeringAngle * torqueFrontRight;
         }
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(TORQUE_CALCULATE_TASK_INTERVAL));
@@ -145,8 +145,8 @@ void Torque_CommandTask(void* arguments) {
         RRFrame.data[6] = 0;
         RRFrame.data[7] = 0;
 
-        CAN_SendFrame(BUS1, &RLFrame);
-        CAN_SendFrame(BUS1, &RRFrame);
+        CAN_SendFrame(BUS2, &RLFrame);
+        CAN_SendFrame(BUS2, &RRFrame);
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(TORQUE_COMMAND_TASK_INTERVAL));
     }
@@ -216,8 +216,8 @@ void Torque_LimitInverters(void) {
     RRFrame.data[6] = 0;
     RRFrame.data[7] = 0;
 
-    CAN_SendFrame(BUS1, &RLFrame);
-    CAN_SendFrame(BUS1, &RRFrame);
+    CAN_SendFrame(BUS2, &RLFrame);
+    CAN_SendFrame(BUS2, &RRFrame);
 }
 
 float Torque_RearLeft(void) { return torqueRearLeft; }

@@ -61,18 +61,19 @@ void Analogs_Init(void) {
     if (handle == NULL) {
         Error_Handler();
     }
-    // HAL_ADC_Start_IT(&hadc1);
 }
 
 void Analogs_Read_Task(void *arguments) {
     for (;;) {
         if (xSemaphoreTake(analogMutex, portMAX_DELAY) == pdTRUE) {
+            // Start one full ADC sequence, then read each rank in order.
+            HAL_ADC_Start(&hadc1);
             for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
-                // Start ADC conversion for each channel
-                HAL_ADC_Start(&hadc1);
+                // Make sure the total polling time does not exceed ANALOG_READ_TASK_INTERVAL
                 HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
                 buffer[i] = HAL_ADC_GetValue(&hadc1) & 0x0FFF;
             }
+            HAL_ADC_Stop(&hadc1);
             xSemaphoreGive(analogMutex);
         }
         vTaskDelay(pdMS_TO_TICKS(ANALOG_READ_TASK_INTERVAL));  // Adjust delay as needed

@@ -34,8 +34,8 @@ void Throttle_Init(void) {
 void Throttle_Task(void* arguments) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     TickType_t throttleValidStart = lastWakeTime;
-    bool plausibilityCheck = false;
-    bool instantValid = false;
+    volatile bool plausibilityCheck = false;
+    volatile bool instantValid = false;
     while (1) {
         uint16_t apps1ADC = Analogs_ReadChannel(APPS_1);
         uint16_t apps2ADC = Analogs_ReadChannel(APPS_2);
@@ -64,20 +64,22 @@ void Throttle_Task(void* arguments) {
             throttleValid = false;
         }
 
-        if (throttleValid) {
-            if (!plausibilityCheck) {  // EV.4.7.1
-                if (apps1 < 0.05) {
-                    plausibilityCheck = true;
-                }
-            } else if (apps1 > 0.25 && Brake_GetState() == HARD_BRAKE) {
-                plausibilityCheck = false;
-            }
-        } else {
-            throttleValue = 0.0f;
+        // if (!plausibilityCheck) {  // EV.4.7.1
+        //     if (apps1 < 0.05) {
+        //         plausibilityCheck = true;
+        //     }
+        // } else if (apps1 > 0.25 && Brake_GetState() == HARD_BRAKE) {
+        //     plausibilityCheck = false;
+        // }
+
+        if (!plausibilityCheck) {
+            plausibilityCheck = true; // Only applies for FSAE, skip for FH&E
         }
 
         if (throttleValid && plausibilityCheck) {
             throttleValue = apps1;
+        } else {
+            throttleValue = 0.0f;
         }
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(THROTTLE_TASK_INTERVAL));
