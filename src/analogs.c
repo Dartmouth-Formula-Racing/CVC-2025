@@ -64,19 +64,23 @@ void Analogs_Init(void) {
 }
 
 void Analogs_Read_Task(void *arguments) {
+    TickType_t lastWakeTime = xTaskGetTickCount();
+
     for (;;) {
         if (xSemaphoreTake(analogMutex, portMAX_DELAY) == pdTRUE) {
             // Start one full ADC sequence, then read each rank in order.
             HAL_ADC_Start(&hadc1);
             for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
                 // Make sure the total polling time does not exceed ANALOG_READ_TASK_INTERVAL
-                HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
-                buffer[i] = HAL_ADC_GetValue(&hadc1) & 0x0FFF;
-            }
+                // 1ms timeout instead of HAL_MAX DELAY blocking forever
+                // buffer[i] = 0;
+                if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
+                    buffer[i] = HAL_ADC_GetValue(&hadc1) & 0x0FFF;}
+                }
             HAL_ADC_Stop(&hadc1);
             xSemaphoreGive(analogMutex);
         }
-        vTaskDelay(pdMS_TO_TICKS(ANALOG_READ_TASK_INTERVAL));  // Adjust delay as needed
+        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(ANALOG_READ_TASK_INTERVAL));  // Adjust delay as needed
     }
 }
 

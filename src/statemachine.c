@@ -19,6 +19,7 @@ void StateMachine_Task(void* arguments);
 
 static VehicleState state = WAIT_FOR_PRECHARGE;
 static DriveState driveState = NEUTRAL;
+static DriveState requestedDriveState = NEUTRAL;
 
 static StackType_t stateMachineTaskStack[STATEMACHINE_TASK_STACK_SIZE];
 static StaticTask_t stateMachineTaskTCB;
@@ -83,13 +84,17 @@ void StateMachine_Task(void* arguments) {
                     break;
                 }
 
+                requestedDriveState = NEUTRAL;
+
                 // Check if drive button is pressed
                 if (HAL_GPIO_ReadPin(Drive_Button_GPIO_Port, Drive_Button_Pin) == GPIO_PIN_RESET) {
                     // Transition to BUZZER state
                     state = BUZZER;
-                    driveState = DRIVE;
+                    driveState = NEUTRAL;
+                    requestedDriveState = DRIVE;
                     driveLockout = true;  // Re-enable drive lockout
                     buzzerStartTime = xTaskGetTickCount();
+                    break;
                 }
 
                 // Check if reverse button is pressed
@@ -97,13 +102,16 @@ void StateMachine_Task(void* arguments) {
                     // Transition to BUZZER state
                     state = BUZZER;
                     if (ALLOW_REVERSE) {
-                        driveState = REVERSE;
+                        requestedDriveState = REVERSE;
                     } else {
-                        driveState = DRIVE;  // If reverse is not allowed, treat it as drive
+                        requestedDriveState = DRIVE;  // If reverse is not allowed, treat it as drive
                     }
+                    driveState = NEUTRAL;
                     driveLockout = true;  // Re-enable drive lockout
                     buzzerStartTime = xTaskGetTickCount();
+                    break;
                 }
+
                 break;
             case BUZZER:
                 // Check if discharged
@@ -174,27 +182,33 @@ void StateMachine_Task(void* arguments) {
                     driveState = NEUTRAL;  // Reset drive state to neutral
                     break;
                 }
+
+                driveState = requestedDriveState;
                 break;
             default:
                 // Invalid state, reset to WAIT_FOR_PRECHARGE
                 // Should never happen
                 state = WAIT_FOR_PRECHARGE;
                 driveState = NEUTRAL;
+                requestedDriveState = NEUTRAL;
                 driveLockout = true;
                 break;
         }
         
-        // DO NOT UNCOMMENT THIS UNLESS YOU WANT TO CHANGE DRIVE STATE WITH NO CHECK!!!!
+        // TEST ONLY: direct drive-state selection from buttons, bypassing the normal drive gating logic above.
         // if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
         //     driveState = NEUTRAL;
+        //     state = NOT_READY_TO_DRIVE;
         // } else if (HAL_GPIO_ReadPin(Drive_Button_GPIO_Port, Drive_Button_Pin) == GPIO_PIN_RESET) {
         //     driveState = DRIVE;
+        //     state = READY_TO_DRIVE;
         // } else if (HAL_GPIO_ReadPin(Reverse_Button_GPIO_Port, Reverse_Button_Pin) == GPIO_PIN_RESET) {
         //     if (ALLOW_REVERSE) {
         //         driveState = REVERSE;
         //     } else {
         //         driveState = DRIVE;
         //     }
+        //     state = READY_TO_DRIVE;
         // }
 
         if (driveState == DRIVE) {

@@ -27,12 +27,12 @@
 
 #define CAN_1_TX_TASK_NAME "can1TxTask"
 #define CAN_1_TX_TASK_STACK_SIZE 128
-#define CAN_1_TX_TASK_PRIORITY osPriorityBelowNormal
+#define CAN_1_TX_TASK_PRIORITY osPriorityNormal
 #define CAN_1_TX_TASK_INTERVAL 1
 
 #define CAN_2_TX_TASK_NAME "can2TxTask"
 #define CAN_2_TX_TASK_STACK_SIZE 128
-#define CAN_2_TX_TASK_PRIORITY osPriorityBelowNormal
+#define CAN_2_TX_TASK_PRIORITY osPriorityNormal
 #define CAN_2_TX_TASK_INTERVAL 1
 
 #define TORQUE_CALCULATE_TASK_NAME "torqueTask"
