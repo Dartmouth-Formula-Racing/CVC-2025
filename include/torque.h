@@ -29,9 +29,14 @@
 
 #define MAX_REGEN_CURRENT 50  // Max regenerative braking current (A)
 
-void Torque_Init(void);
+typedef struct {
+    float rearLeft;
+    float rearRight;
+    float frontLeft;
+    float frontRight;
+} TorqueValues;
 
-float Torque_RearLeft(void);
-float Torque_RearRight(void);
-float Torque_FrontLeft(void);
-float Torque_FrontRight(void);
+void Torque_Init(void);
+void Torque_SendInverterFaultClear(void);
+
+TorqueValues Torque_GetValues(void);

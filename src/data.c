@@ -58,12 +58,6 @@ void Data_Init(void) {
         InverterRRData[i].data = 0;
         InverterRRData[i].time = 0;
     }
-
-    xSemaphoreGive(CVCDataMutex);
-    xSemaphoreGive(BMSDataMutex);
-    xSemaphoreGive(VDMDataMutex);
-    xSemaphoreGive(InverterRLDataMutex);
-    xSemaphoreGive(InverterRRDataMutex);
 }
 
 void CVCDataSet(CVC_Data_Index index, uint32_t value) {

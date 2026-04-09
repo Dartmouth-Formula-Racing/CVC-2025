@@ -8,8 +8,6 @@
 #ifndef ANALOGS_H
 #define ANALOGS_H
 
-#include <semphr.h>
-
 typedef enum {
     APPS_1,
     APPS_2,
@@ -26,11 +24,12 @@ typedef enum {
     ADC_CHANNEL_COUNT  // Total number of analog channels, must be last
 } AnalogChannel;
 
-extern SemaphoreHandle_t analogMutex;
-
 #define ANALOG_INVALID 0xFFFF
+
+#define ADC_POLL_TIMEOUT_MS 5
 
 void Analogs_Init(void);
 uint16_t Analogs_ReadChannel(AnalogChannel ch);
+uint32_t Analogs_GetTimeoutCount(void);
 
 #endif  // ANALOGS_H

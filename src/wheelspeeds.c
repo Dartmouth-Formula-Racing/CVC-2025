@@ -34,16 +34,10 @@ static StaticTask_t wheelSpeedsTaskTCB;
 void WheelSpeeds_Task(void* arguments);
 
 void WheelSpeeds_Init(void) {
-    wheelSpeedsMutex = xSemaphoreCreateBinary();
+    wheelSpeedsMutex = xSemaphoreCreateMutexStatic(&wheelSpeedsMutexBuffer);
     if (wheelSpeedsMutex == NULL) {
         Error_Handler();
     }
-
-    wheelSpeedsMutex = xSemaphoreCreateBinaryStatic(&wheelSpeedsMutexBuffer);
-    if (wheelSpeedsMutex == NULL) {
-        Error_Handler();
-    }
-    xSemaphoreGive(wheelSpeedsMutex);
 
     TaskHandle_t handle = xTaskCreateStatic(WheelSpeeds_Task, WHEEL_SPEEDS_TASK_NAME, WHEEL_SPEEDS_TASK_STACK_SIZE, NULL, WHEEL_SPEEDS_TASK_PRIORITY,
                                             wheelSpeedsTaskStack, &wheelSpeedsTaskTCB);
@@ -94,7 +88,6 @@ float wheelSpeed_FL() {
     return speed;
 }
 
-
 float wheelSpeed_FR() {
     float speed = 0.0f;
     if (xSemaphoreTake(wheelSpeedsMutex, portMAX_DELAY) == pdTRUE) {
@@ -104,7 +97,6 @@ float wheelSpeed_FR() {
     return speed;
 }
 
-
 float wheelSpeed_RL() {
     float speed = 0.0f;
     if (xSemaphoreTake(wheelSpeedsMutex, portMAX_DELAY) == pdTRUE) {
@@ -113,7 +105,6 @@ float wheelSpeed_RL() {
     }
     return speed;
 }
-
 
 float wheelSpeed_RR() {
     float speed = 0.0f;

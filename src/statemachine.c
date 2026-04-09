@@ -14,6 +14,7 @@
 #include <task.h>
 #include <tasks.h>
 #include <throttle.h>
+#include <torque.h>
 
 void StateMachine_Task(void* arguments);
 
@@ -36,13 +37,23 @@ void StateMachine_Task(void* arguments) {
     bool driveLockout = true;  // Locks out drive/reverse until neutral is pressed
     TickType_t buzzerStartTime = xTaskGetTickCount();
     TickType_t lastWakeTime = xTaskGetTickCount();
+    VehicleState previousState = WAIT_FOR_PRECHARGE;
+    volatile bool mcuContactor1Closed;
+    volatile bool mcuContactor2Closed;
 
+
+
+    previousState = state;
     while (1) {
         TickType_t now = xTaskGetTickCount();
 
         if (driveLockout && HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
             driveLockout = false;
         }
+
+        // debugging checks for contactor states
+        mcuContactor1Closed = HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin);
+        mcuContactor2Closed = HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin);
 
         switch (state) {
             case WAIT_FOR_PRECHARGE:
@@ -101,6 +112,7 @@ void StateMachine_Task(void* arguments) {
                 if (HAL_GPIO_ReadPin(Reverse_Button_GPIO_Port, Reverse_Button_Pin) == GPIO_PIN_RESET) {
                     // Transition to BUZZER state
                     state = BUZZER;
+                    Torque_SendInverterFaultClear();
                     if (ALLOW_REVERSE) {
                         requestedDriveState = REVERSE;
                     } else {
@@ -194,22 +206,22 @@ void StateMachine_Task(void* arguments) {
                 driveLockout = true;
                 break;
         }
-        
+
         // TEST ONLY: direct drive-state selection from buttons, bypassing the normal drive gating logic above.
-        // if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
-        //     driveState = NEUTRAL;
-        //     state = NOT_READY_TO_DRIVE;
-        // } else if (HAL_GPIO_ReadPin(Drive_Button_GPIO_Port, Drive_Button_Pin) == GPIO_PIN_RESET) {
-        //     driveState = DRIVE;
-        //     state = READY_TO_DRIVE;
-        // } else if (HAL_GPIO_ReadPin(Reverse_Button_GPIO_Port, Reverse_Button_Pin) == GPIO_PIN_RESET) {
-        //     if (ALLOW_REVERSE) {
-        //         driveState = REVERSE;
-        //     } else {
-        //         driveState = DRIVE;
-        //     }
-        //     state = READY_TO_DRIVE;
-        // }
+        if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
+            driveState = NEUTRAL;
+            state = NOT_READY_TO_DRIVE;
+        } else if (HAL_GPIO_ReadPin(Drive_Button_GPIO_Port, Drive_Button_Pin) == GPIO_PIN_RESET) {
+            driveState = DRIVE;
+            state = READY_TO_DRIVE;
+        } else if (HAL_GPIO_ReadPin(Reverse_Button_GPIO_Port, Reverse_Button_Pin) == GPIO_PIN_RESET) {
+            if (ALLOW_REVERSE) {
+                driveState = REVERSE;
+            } else {
+                driveState = DRIVE;
+            }
+            state = READY_TO_DRIVE;
+        }
 
         if (driveState == DRIVE) {
             HAL_GPIO_WritePin(Drive_LED_GPIO_Port, Drive_LED_Pin, GPIO_PIN_SET);

@@ -164,6 +164,7 @@ void CAN_Parse_EMUS_DiagnosticCodes() {
 void CAN_Parse_EMUS_BatteryVoltageOverallParameters() {
     xSemaphoreTake(canMutex, portMAX_DELAY);
     if (canData[EMUS_BatteryVoltageOverallParameters].parsed) {
+        xSemaphoreGive(canMutex);
         return;
     }
     uint8_t data[8] = {0};

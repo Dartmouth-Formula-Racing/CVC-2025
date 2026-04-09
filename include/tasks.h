@@ -27,12 +27,12 @@
 
 #define CAN_1_TX_TASK_NAME "can1TxTask"
 #define CAN_1_TX_TASK_STACK_SIZE 128
-#define CAN_1_TX_TASK_PRIORITY osPriorityNormal
+#define CAN_1_TX_TASK_PRIORITY osPriorityAboveNormal
 #define CAN_1_TX_TASK_INTERVAL 1
 
 #define CAN_2_TX_TASK_NAME "can2TxTask"
 #define CAN_2_TX_TASK_STACK_SIZE 128
-#define CAN_2_TX_TASK_PRIORITY osPriorityNormal
+#define CAN_2_TX_TASK_PRIORITY osPriorityAboveNormal
 #define CAN_2_TX_TASK_INTERVAL 1
 
 #define TORQUE_CALCULATE_TASK_NAME "torqueTask"
@@ -42,7 +42,7 @@
 
 #define TORQUE_COMMAND_TASK_NAME "torqueCommandTask"
 #define TORQUE_COMMAND_TASK_STACK_SIZE 128
-#define TORQUE_COMMAND_TASK_PRIORITY osPriorityNormal
+#define TORQUE_COMMAND_TASK_PRIORITY osPriorityAboveNormal
 #define TORQUE_COMMAND_TASK_INTERVAL 3
 
 #define TORQUE_LIMIT_TASK_NAME "torqueLimitTask"
@@ -69,11 +69,5 @@
 #define WHEEL_SPEEDS_TASK_STACK_SIZE 128
 #define WHEEL_SPEEDS_TASK_PRIORITY osPriorityLow
 #define WHEEL_SPEEDS_TASK_INTERVAL 10
-
-#define ANALOG_READ_TASK_NAME "analogReadTask"
-#define ANALOG_READ_TASK_STACK_SIZE 128
-#define ANALOG_READ_TASK_PRIORITY osPriorityBelowNormal
-#define ANALOG_READ_TASK_INTERVAL 1
-
 
 #endif  // CVC_TASKS_H

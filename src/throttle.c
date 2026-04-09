@@ -11,6 +11,7 @@
 #include <math.h>
 #include <misc.h>
 #include <stdbool.h>
+#include <task.h>
 #include <tasks.h>
 #include <throttle.h>
 
@@ -77,7 +78,7 @@ void Throttle_Task(void* arguments) {
         // }
 
         if (!plausibilityCheck) {
-            plausibilityCheck = true; // Only applies for FSAE, skip for FH&E
+            plausibilityCheck = true;  // Only applies for FSAE, skip for FH&E
         }
 
         if (throttleValid && plausibilityCheck) {

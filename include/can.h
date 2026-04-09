@@ -17,6 +17,7 @@
 
 #define CAN_BUFFER_LENGTH 64
 #define CAN_MAX_SEND_TIME 10  // ms
+#define CAN_TX_QUEUE_TIMEOUT_MS 0
 
 #define CAN_EMUS_USE_EXT 0        // 1 if using extended IDs, 0 if using standard IDs
 #define CAN_EMUS_BASE_EXT 0x19B5  // Base ID for EMUS BMS 29-bit IDs
@@ -111,6 +112,7 @@ typedef enum {
 
 typedef struct {
     uint32_t canID;
+    uint32_t canIDE;
     CAN_Message_Index index;
     uint8_t data[8];
     uint32_t timestamp;
@@ -140,9 +142,13 @@ void CAN_Init(void);
 CAN_Data_Entry CAN_getDataByIndex(CAN_Message_Index index);
 CAN_Data_Entry* CAN_getPtrByIndex(CAN_Message_Index index);
 
-CAN_Data_Entry CAN_getDataByID(uint32_t canID);
-CAN_Data_Entry* CAN_getPtrByID(uint32_t canID);
+CAN_Data_Entry CAN_getDataByID(uint32_t canID, uint32_t canIDE);
+CAN_Data_Entry* CAN_getPtrByID(uint32_t canID, uint32_t canIDE);
 
 void CAN_SendFrame(CAN_Bus bus, CAN_Frame* frame);
+
+uint32_t CAN_GetBus1TxDropCount(void);
+uint32_t CAN_GetBus2TxDropCount(void);
+uint32_t CAN_GetRxDropCount(void);
 
 #endif  // CVC_CAN_H
