@@ -35,11 +35,11 @@ void Throttle_Init(void) {
 void Throttle_Task(void* arguments) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     TickType_t throttleValidStart = lastWakeTime;
-    volatile bool plausibilityCheck = false;
-    volatile bool instantValid = false;
+    bool plausibilityCheck = false;
+    bool instantValid = false;
     while (1) {
-        volatile uint16_t apps1ADC = Analogs_ReadChannel(APPS_1);
-        volatile uint16_t apps2ADC = Analogs_ReadChannel(APPS_2);
+        uint16_t apps1ADC = Analogs_ReadChannel(APPS_1);
+        uint16_t apps2ADC = Analogs_ReadChannel(APPS_2);
         apps1ADC = apps1ADC < APPS1_MIN ? APPS1_MIN : apps1ADC;
         apps1ADC = apps1ADC > APPS1_MAX ? APPS1_MAX : apps1ADC;
         apps2ADC = apps2ADC < APPS2_MIN ? APPS2_MIN : apps2ADC;

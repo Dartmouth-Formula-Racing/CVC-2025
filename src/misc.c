@@ -48,6 +48,10 @@ void Misc_Init(void) {
     if (handle == NULL) {
         Error_Handler();
     }
+
+    if (HAL_TIM_PWM_Start(&htim11, TIM_CHANNEL_1) != HAL_OK || HAL_TIM_PWM_Start(&htim12, TIM_CHANNEL_1) != HAL_OK) {
+        Error_Handler();
+    }
 }
 
 void StateMachine_Output_Task(void* arguments) {
@@ -57,9 +61,13 @@ void StateMachine_Output_Task(void* arguments) {
         if (StateMachine_GetState() == BUZZER || StateMachine_GetState() == READY_TO_DRIVE) {
             HAL_GPIO_WritePin(Left_Inverter_Enable_GPIO_Port, Left_Inverter_Enable_Pin, GPIO_PIN_SET);
             HAL_GPIO_WritePin(Right_Inverter_Enable_GPIO_Port, Right_Inverter_Enable_Pin, GPIO_PIN_SET);
+            __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, htim11.Init.Period);
+            __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, htim12.Init.Period);
         } else {
             HAL_GPIO_WritePin(Left_Inverter_Enable_GPIO_Port, Left_Inverter_Enable_Pin, GPIO_PIN_RESET);
             HAL_GPIO_WritePin(Right_Inverter_Enable_GPIO_Port, Right_Inverter_Enable_Pin, GPIO_PIN_RESET);
+            __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, 0);
+            __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 0);
         }
 
         if (StateMachine_GetDriveState() != NEUTRAL) {
@@ -165,7 +173,7 @@ void Dashboard_Broadcast_Task(void* arguments) {
     TickType_t lastWakeTime = xTaskGetTickCount();
 
     while (1) {
-        CAN_Frame frame;
+        CAN_Frame frame = {0};
         frame.header.tx.StdId = Dashboard_STD(0);
         frame.header.tx.IDE = CAN_ID_STD;
         frame.header.tx.RTR = CAN_RTR_DATA;
@@ -178,6 +186,7 @@ void Dashboard_Broadcast_Task(void* arguments) {
         frame.data[4] = (uint8_t)StateMachine_GetDriveState();
         frame.data[5] = (uint8_t)StateMachine_GetState();
         frame.data[6] = 0;
+        frame.data[7] = 0;
         CAN_SendFrame(BUS1, &frame);
 
         frame.header.tx.StdId = Dashboard_STD(1);

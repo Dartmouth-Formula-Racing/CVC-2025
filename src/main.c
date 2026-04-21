@@ -22,6 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <task.h>
 #include <analogs.h>
 #include <can.h>
 #include <data.h>
@@ -382,7 +383,7 @@ static void MX_CAN1_Init(void) {
         Error_Handler();
     }
     /* USER CODE BEGIN CAN1_Init 2 */
-    for (uint8_t i = 0; i < 28; i++) {
+    for (uint8_t i = 0; i < 14; i++) {
         CAN_FilterTypeDef can_filter;
         can_filter.FilterBank = i;
         can_filter.FilterMode = CAN_FILTERMODE_IDMASK;
@@ -436,7 +437,7 @@ static void MX_CAN2_Init(void) {
         Error_Handler();
     }
     /* USER CODE BEGIN CAN2_Init 2 */
-    for (uint8_t i = 0; i < 28; i++) {
+    for (uint8_t i = 14; i < 28; i++) {
         CAN_FilterTypeDef can_filter;
         can_filter.FilterBank = i;
         can_filter.FilterMode = CAN_FILTERMODE_IDMASK;
@@ -985,6 +986,14 @@ static void MX_GPIO_Init(void) {
 }
 
 /* USER CODE BEGIN 4 */
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char* pcTaskName) {
+    (void)xTask;
+    (void)pcTaskName;
+    __disable_irq();
+    while (1) {
+    }
+}
 
 /* USER CODE END 4 */
 
