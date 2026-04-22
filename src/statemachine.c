@@ -55,157 +55,157 @@ void StateMachine_Task(void* arguments) {
         mcuContactor1Closed = HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin);
         mcuContactor2Closed = HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin);
 
-        switch (state) {
-            case WAIT_FOR_PRECHARGE:
-                // Precharge starts when AIR 1 closes
-                if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_SET) {
-                    state = PRECHARGE;
-                }
-                break;
-            case PRECHARGE:
-                // Precharge ends when AIR 2 closes
-                if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_SET) {
-                    state = NOT_READY_TO_DRIVE;
-                } else if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
-                    state = WAIT_FOR_PRECHARGE;
-                }
-                break;
-            case NOT_READY_TO_DRIVE:
-                // Check if discharged
-                if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
-                    state = WAIT_FOR_PRECHARGE;
-                    break;
-                }
-                if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
-                    state = PRECHARGE;
-                    break;
-                }
+        // switch (state) {
+        //     case WAIT_FOR_PRECHARGE:
+        //         // Precharge starts when AIR 1 closes
+        //         if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_SET) {
+        //             state = PRECHARGE;
+        //         }
+        //         break;
+        //     case PRECHARGE:
+        //         // Precharge ends when AIR 2 closes
+        //         if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_SET) {
+        //             state = NOT_READY_TO_DRIVE;
+        //         } else if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
+        //             state = WAIT_FOR_PRECHARGE;
+        //         }
+        //         break;
+        //     case NOT_READY_TO_DRIVE:
+        //         // Check if discharged
+        //         if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
+        //             state = WAIT_FOR_PRECHARGE;
+        //             break;
+        //         }
+        //         if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
+        //             state = PRECHARGE;
+        //             break;
+        //         }
 
-                // Check if drive lockout is active
-                if (driveLockout) {
-                    state = NOT_READY_TO_DRIVE;
-                    driveState = NEUTRAL;  // Reset drive state to neutral
-                    break;
-                }
+        //         // Check if drive lockout is active
+        //         if (driveLockout) {
+        //             state = NOT_READY_TO_DRIVE;
+        //             driveState = NEUTRAL;  // Reset drive state to neutral
+        //             break;
+        //         }
 
-                // Check if throttle is valid and under threshold
-                if (!Throttle_Valid() || Throttle_GetValue() > MAX_RTD_THROTTLE) {
-                    state = NOT_READY_TO_DRIVE;
-                    driveState = NEUTRAL;  // Reset drive state to neutral
-                    break;
-                }
+        //         // Check if throttle is valid and under threshold
+        //         if (!Throttle_Valid() || Throttle_GetValue() > MAX_RTD_THROTTLE) {
+        //             state = NOT_READY_TO_DRIVE;
+        //             driveState = NEUTRAL;  // Reset drive state to neutral
+        //             break;
+        //         }
 
-                requestedDriveState = NEUTRAL;
+        //         requestedDriveState = NEUTRAL;
 
-                // Check if drive button is pressed
-                if (HAL_GPIO_ReadPin(Drive_Button_GPIO_Port, Drive_Button_Pin) == GPIO_PIN_RESET) {
-                    // Transition to BUZZER state
-                    state = BUZZER;
-                    driveState = NEUTRAL;
-                    requestedDriveState = DRIVE;
-                    driveLockout = true;  // Re-enable drive lockout
-                    buzzerStartTime = xTaskGetTickCount();
-                    break;
-                }
+        //         // Check if drive button is pressed
+        //         if (HAL_GPIO_ReadPin(Drive_Button_GPIO_Port, Drive_Button_Pin) == GPIO_PIN_RESET) {
+        //             // Transition to BUZZER state
+        //             state = BUZZER;
+        //             driveState = NEUTRAL;
+        //             requestedDriveState = DRIVE;
+        //             driveLockout = true;  // Re-enable drive lockout
+        //             buzzerStartTime = xTaskGetTickCount();
+        //             break;
+        //         }
 
-                // Check if reverse button is pressed
-                if (HAL_GPIO_ReadPin(Reverse_Button_GPIO_Port, Reverse_Button_Pin) == GPIO_PIN_RESET) {
-                    // Transition to BUZZER state
-                    state = BUZZER;
-                    Torque_SendInverterFaultClear();
-                    if (ALLOW_REVERSE) {
-                        requestedDriveState = REVERSE;
-                    } else {
-                        requestedDriveState = DRIVE;  // If reverse is not allowed, treat it as drive
-                    }
-                    driveState = NEUTRAL;
-                    driveLockout = true;  // Re-enable drive lockout
-                    buzzerStartTime = xTaskGetTickCount();
-                    break;
-                }
+        //         // Check if reverse button is pressed
+        //         if (HAL_GPIO_ReadPin(Reverse_Button_GPIO_Port, Reverse_Button_Pin) == GPIO_PIN_RESET) {
+        //             // Transition to BUZZER state
+        //             state = BUZZER;
+        //             Torque_SendInverterFaultClear();
+        //             if (ALLOW_REVERSE) {
+        //                 requestedDriveState = REVERSE;
+        //             } else {
+        //                 requestedDriveState = DRIVE;  // If reverse is not allowed, treat it as drive
+        //             }
+        //             driveState = NEUTRAL;
+        //             driveLockout = true;  // Re-enable drive lockout
+        //             buzzerStartTime = xTaskGetTickCount();
+        //             break;
+        //         }
 
-                break;
-            case BUZZER:
-                // Check if discharged
-                if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
-                    state = WAIT_FOR_PRECHARGE;
-                    driveState = NEUTRAL;
-                    HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
-                    break;
-                }
-                if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
-                    state = PRECHARGE;
-                    driveState = NEUTRAL;
-                    HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
-                    break;
-                }
+        //         break;
+        //     case BUZZER:
+        //         // Check if discharged
+        //         if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
+        //             state = WAIT_FOR_PRECHARGE;
+        //             driveState = NEUTRAL;
+        //             HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
+        //             break;
+        //         }
+        //         if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
+        //             state = PRECHARGE;
+        //             driveState = NEUTRAL;
+        //             HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
+        //             break;
+        //         }
 
-                // Check if neutral button is pressed, neutral should be able to cancel drive/reverse
-                if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
-                    // Reset to NOT_READY_TO_DRIVE state
-                    state = NOT_READY_TO_DRIVE;
-                    driveState = NEUTRAL;
-                    HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
-                    break;
-                }
+        //         // Check if neutral button is pressed, neutral should be able to cancel drive/reverse
+        //         if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
+        //             // Reset to NOT_READY_TO_DRIVE state
+        //             state = NOT_READY_TO_DRIVE;
+        //             driveState = NEUTRAL;
+        //             HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
+        //             break;
+        //         }
 
-                // Check if throttle is valid and under threshold
-                if (!Throttle_Valid() || Throttle_GetValue() > MAX_RTD_THROTTLE) {
-                    state = NOT_READY_TO_DRIVE;
-                    driveState = NEUTRAL;  // Reset drive state to neutral
-                    break;
-                }
+        //         // Check if throttle is valid and under threshold
+        //         if (!Throttle_Valid() || Throttle_GetValue() > MAX_RTD_THROTTLE) {
+        //             state = NOT_READY_TO_DRIVE;
+        //             driveState = NEUTRAL;  // Reset drive state to neutral
+        //             break;
+        //         }
 
-                // Turn on buzzer
-                if (now - buzzerStartTime >= BUZZER_TIME) {
-                    state = READY_TO_DRIVE;
-                    HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
-                } else {
-                    HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_SET);
-                }
-                break;
-            case READY_TO_DRIVE:
-                // Check if discharged
-                if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
-                    state = WAIT_FOR_PRECHARGE;
-                    driveState = NEUTRAL;
-                    HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
-                    break;
-                }
-                if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
-                    state = PRECHARGE;
-                    driveState = NEUTRAL;
-                    HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
-                    break;
-                }
+        //         // Turn on buzzer
+        //         if (now - buzzerStartTime >= BUZZER_TIME) {
+        //             state = READY_TO_DRIVE;
+        //             HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
+        //         } else {
+        //             HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_SET);
+        //         }
+        //         break;
+        //     case READY_TO_DRIVE:
+        //         // Check if discharged
+        //         if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
+        //             state = WAIT_FOR_PRECHARGE;
+        //             driveState = NEUTRAL;
+        //             HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
+        //             break;
+        //         }
+        //         if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
+        //             state = PRECHARGE;
+        //             driveState = NEUTRAL;
+        //             HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
+        //             break;
+        //         }
 
-                // Check if neutral button is pressed
-                if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
-                    // Reset to NOT_READY_TO_DRIVE state
-                    state = NOT_READY_TO_DRIVE;
-                    driveState = NEUTRAL;
-                    HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
-                    break;
-                }
+        //         // Check if neutral button is pressed
+        //         if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
+        //             // Reset to NOT_READY_TO_DRIVE state
+        //             state = NOT_READY_TO_DRIVE;
+        //             driveState = NEUTRAL;
+        //             HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
+        //             break;
+        //         }
 
-                // Check if throttle is valid
-                if (!Throttle_Valid()) {
-                    state = NOT_READY_TO_DRIVE;
-                    driveState = NEUTRAL;  // Reset drive state to neutral
-                    break;
-                }
+        //         // Check if throttle is valid
+        //         if (!Throttle_Valid()) {
+        //             state = NOT_READY_TO_DRIVE;
+        //             driveState = NEUTRAL;  // Reset drive state to neutral
+        //             break;
+        //         }
 
-                driveState = requestedDriveState;
-                break;
-            default:
-                // Invalid state, reset to WAIT_FOR_PRECHARGE
-                // Should never happen
-                state = WAIT_FOR_PRECHARGE;
-                driveState = NEUTRAL;
-                requestedDriveState = NEUTRAL;
-                driveLockout = true;
-                break;
-        }
+        //         driveState = requestedDriveState;
+        //         break;
+        //     default:
+        //         // Invalid state, reset to WAIT_FOR_PRECHARGE
+        //         // Should never happen
+        //         state = WAIT_FOR_PRECHARGE;
+        //         driveState = NEUTRAL;
+        //         requestedDriveState = NEUTRAL;
+        //         driveLockout = true;
+        //         break;
+        // }
 
         // TEST ONLY: direct drive-state selection from buttons, bypassing the normal drive gating logic above.
         if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {

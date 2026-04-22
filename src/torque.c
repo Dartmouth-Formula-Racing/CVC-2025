@@ -153,14 +153,14 @@ void Torque_CommandTask(void* arguments) {
         // CAN_Frame FLFrame = {0};
         // CAN_Frame FRFrame = {0};
 
-        RLFrame.header.tx.StdId = InverterRL_STD(0x10);
-        RLFrame.header.tx.ExtId = InverterRL_EXT(0x10);
+        RLFrame.header.tx.StdId = InverterRL_STD(0x20);
+        RLFrame.header.tx.ExtId = InverterRL_EXT(0x20);
         RLFrame.header.tx.IDE = INVERTER_CAN_IDE;
         RLFrame.header.tx.RTR = CAN_RTR_DATA;
         RLFrame.header.tx.DLC = 8;
 
-        RRFrame.header.tx.StdId = InverterRR_STD(0x10);
-        RRFrame.header.tx.ExtId = InverterRR_EXT(0x10);
+        RRFrame.header.tx.StdId = InverterRR_STD(0x20);
+        RRFrame.header.tx.ExtId = InverterRR_EXT(0x20);
         RRFrame.header.tx.IDE = INVERTER_CAN_IDE;
         RRFrame.header.tx.RTR = CAN_RTR_DATA;
         RRFrame.header.tx.DLC = 8;
@@ -190,7 +190,7 @@ void Torque_CommandTask(void* arguments) {
         RLFrame.data[5] = 0;
         RRFrame.data[5] = 0;
 
-        if (driveState != NEUTRAL) {
+        if ((driveState != NEUTRAL) && ((int16_t)torqueValues.rearLeft != 0) || ((int16_t)torqueValues.rearRight != 0)) {
             // Enable inverters
             RLFrame.data[5] |= 0x01;  // Enable left inverter
             RRFrame.data[5] |= 0x01;  // Enable right inverter

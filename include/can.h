@@ -26,7 +26,7 @@
 #define CAN_VDM_USE_EXT 1         // 1 if using extended IDs, 0 if using standard IDs
 #define CAN_VDM_BASE_EXT 0x0000A  // Base ID for VDM 29-bit IDs
 
-#define CAN_INVERTER_USE_EXT 1           // 1 if using extended IDs, 0 if using standard IDs
+#define CAN_INVERTER_USE_EXT 0           // 1 if using extended IDs, 0 if using standard IDs
 #define CAN_INVERTER_BASE_ID1_STD 0x0D0  // Base ID for Inverter 1
 #define CAN_INVERTER_BASE_ID2_STD 0x0A0  // Base ID for Inverter 2
 #define CAN_INVERTER_BASE_ID1_EXT 0x6C0  // Base ID for Inverter 1
