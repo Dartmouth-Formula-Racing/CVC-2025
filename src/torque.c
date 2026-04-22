@@ -122,13 +122,13 @@ void Torque_CalculateTask(void* arguments) {
             frontRight *= REVERSE_TORQUE_LIMIT;
         }
 
-        if (steeringAngle > 0.0f) {
-            rearLeft -= TORQUE_VECTORING_GAIN * steeringAngle * rearLeft;
-            frontLeft -= TORQUE_VECTORING_GAIN * steeringAngle * frontLeft;
-        } else {
-            rearRight -= TORQUE_VECTORING_GAIN * steeringAngle * rearRight;
-            frontRight -= TORQUE_VECTORING_GAIN * steeringAngle * frontRight;
-        }
+        // if (steeringAngle > 0.0f) {
+        //     rearLeft -= TORQUE_VECTORING_GAIN * steeringAngle * rearLeft;
+        //     frontLeft -= TORQUE_VECTORING_GAIN * steeringAngle * frontLeft;
+        // } else {
+        //     rearRight -= TORQUE_VECTORING_GAIN * steeringAngle * rearRight;
+        //     frontRight -= TORQUE_VECTORING_GAIN * steeringAngle * frontRight;
+        // }
 
         if (xSemaphoreTake(torqueDataMutex, portMAX_DELAY) == pdTRUE) {
             torqueRearLeft = rearLeft;
@@ -179,11 +179,11 @@ void Torque_CommandTask(void* arguments) {
 
         // Direction command
         if (driveState == REVERSE) {
-            RLFrame.data[4] = 0;  // Reverse left motor
-            RRFrame.data[4] = 1;
+            RLFrame.data[4] = 1;  // Reverse left motor
+            RRFrame.data[4] = 0;
         } else {
-            RLFrame.data[4] = 1;
-            RRFrame.data[4] = 0;  // Reverse right motor
+            RLFrame.data[4] = 0;
+            RRFrame.data[4] = 1;  // Reverse right motor
         }
 
         // Inverter enable, discharge, & speed mode bits
@@ -270,8 +270,8 @@ void Torque_LimitTask(void* arguments) {
         RRFrame.data[6] = 0;
         RRFrame.data[7] = 0;
 
-        CAN_SendFrame(BUS2, &RLFrame);
-        CAN_SendFrame(BUS2, &RRFrame);
+        // CAN_SendFrame(BUS2, &RLFrame);
+        // CAN_SendFrame(BUS2, &RRFrame);
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(TORQUE_LIMIT_TASK_INTERVAL));
     }
