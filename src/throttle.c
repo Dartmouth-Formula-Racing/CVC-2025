@@ -11,6 +11,7 @@
 #include <math.h>
 #include <misc.h>
 #include <stdbool.h>
+#include <semphr.h>
 #include <task.h>
 #include <tasks.h>
 #include <throttle.h>
@@ -18,13 +19,19 @@
 static bool throttleValid = false;
 static float throttleValue = 0.0f;
 
+static SemaphoreHandle_t throttleMutex = NULL;
+static StaticSemaphore_t throttleMutexBuffer;
+
 static StackType_t throttleTaskStack[THROTTLE_TASK_STACK_SIZE];
 static StaticTask_t throttleTaskTCB;
 
 void Throttle_Task(void* arguments);
 
 void Throttle_Init(void) {
-    // Initialize throttle task using static allocation
+    throttleMutex = xSemaphoreCreateMutexStatic(&throttleMutexBuffer);
+    if (throttleMutex == NULL) {
+        Error_Handler();
+    }
     TaskHandle_t handle =
         xTaskCreateStatic(Throttle_Task, THROTTLE_TASK_NAME, THROTTLE_TASK_STACK_SIZE, NULL, THROTTLE_TASK_PRIORITY, throttleTaskStack, &throttleTaskTCB);
     if (handle == NULL) {
@@ -81,16 +88,33 @@ void Throttle_Task(void* arguments) {
             plausibilityCheck = true;  // Only applies for FSAE, skip for FH&E
         }
 
-        if (throttleValid && plausibilityCheck) {
-            throttleValue = apps1;
-        } else {
-            throttleValue = 0.0f;
+        if (xSemaphoreTake(throttleMutex, portMAX_DELAY) == pdTRUE) {
+            if (throttleValid && plausibilityCheck) {
+                throttleValue = apps1;
+            } else {
+                throttleValue = 0.0f;
+            }
+            xSemaphoreGive(throttleMutex);
         }
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(THROTTLE_TASK_INTERVAL));
     }
 }
 
-bool Throttle_Valid(void) { return throttleValid; }
+bool Throttle_Valid(void) {
+    bool valid = false;
+    if (xSemaphoreTake(throttleMutex, portMAX_DELAY) == pdTRUE) {
+        valid = throttleValid;
+        xSemaphoreGive(throttleMutex);
+    }
+    return valid;
+}
 
-float Throttle_GetValue(void) { return throttleValue; }
+float Throttle_GetValue(void) {
+    float value = 0.0f;
+    if (xSemaphoreTake(throttleMutex, portMAX_DELAY) == pdTRUE) {
+        value = throttleValue;
+        xSemaphoreGive(throttleMutex);
+    }
+    return value;
+}

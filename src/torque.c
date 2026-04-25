@@ -190,7 +190,7 @@ void Torque_CommandTask(void* arguments) {
         RLFrame.data[5] = 0;
         RRFrame.data[5] = 0;
 
-        if ((driveState != NEUTRAL) && ((int16_t)torqueValues.rearLeft != 0) || ((int16_t)torqueValues.rearRight != 0)) {
+        if ((driveState != NEUTRAL) && ((int16_t)torqueValues.rearLeft != 0 || (int16_t)torqueValues.rearRight != 0)) {
             // Enable inverters
             RLFrame.data[5] |= 0x01;  // Enable left inverter
             RRFrame.data[5] |= 0x01;  // Enable right inverter
@@ -218,6 +218,7 @@ void Torque_LimitTask(void* arguments) {
         // Bytes [0, 1] - Discharge current limit (A)
         // Bytes [2, 3] - Charge current limit (A)
         // Does not include traction control or torque vectoring yet, assumes even power split
+        // Ensure CAN_BMS_Limit_Enable_EEPROM is set to 1
         float busVoltage = (float)BMSDataGet(BMS_TOTAL_VOLTAGE).data / 100.0f;
 
         float maxDischarge = (MAX_POWER * 1000.0f / busVoltage) / 2;
@@ -240,15 +241,13 @@ void Torque_LimitTask(void* arguments) {
         CAN_Frame RLFrame = {0};
         CAN_Frame RRFrame = {0};
 
-        RLFrame.header.tx.StdId = InverterRL_STD(0x02);
-        RLFrame.header.tx.ExtId = InverterRL_EXT(0x02);
-        RLFrame.header.tx.IDE = INVERTER_CAN_IDE;
+        RLFrame.header.tx.StdId = 0x202;
+        RLFrame.header.tx.IDE = CAN_ID_STD;
         RLFrame.header.tx.RTR = CAN_RTR_DATA;
         RLFrame.header.tx.DLC = 8;
 
-        RRFrame.header.tx.StdId = InverterRR_STD(0x02);
-        RRFrame.header.tx.ExtId = InverterRR_EXT(0x02);
-        RRFrame.header.tx.IDE = INVERTER_CAN_IDE;
+        RRFrame.header.tx.StdId = 0x202;
+        RRFrame.header.tx.IDE = CAN_ID_STD;
         RRFrame.header.tx.RTR = CAN_RTR_DATA;
         RRFrame.header.tx.DLC = 8;
 
@@ -270,8 +269,8 @@ void Torque_LimitTask(void* arguments) {
         RRFrame.data[6] = 0;
         RRFrame.data[7] = 0;
 
-        // CAN_SendFrame(BUS2, &RLFrame);
-        // CAN_SendFrame(BUS2, &RRFrame);
+        CAN_SendFrame(BUS2, &RLFrame);
+        CAN_SendFrame(BUS2, &RRFrame);
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(TORQUE_LIMIT_TASK_INTERVAL));
     }
