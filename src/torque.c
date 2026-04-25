@@ -122,10 +122,10 @@ void Torque_CalculateTask(void* arguments) {
         volatile float steeringAngle = 1.0f - 2.0f * (float)(steeringUnwrapped - STEERING_LEFT_LIMIT)
                                 / (float)(STEERING_RIGHT_LIMIT - STEERING_LEFT_LIMIT);
 
-        rearLeft = throttle * TORQUE_MAX * 10.0;
-        rearRight = throttle * TORQUE_MAX * 10.0;
-        frontLeft = throttle * TORQUE_MAX * 10.0;
-        frontRight = throttle * TORQUE_MAX * 10.0;
+        rearLeft = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
+        rearRight = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
+        frontLeft = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
+        frontRight = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
 
         if (StateMachine_GetDriveState() == REVERSE) {
             rearLeft *= REVERSE_TORQUE_LIMIT;
