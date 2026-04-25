@@ -61,8 +61,6 @@ void StateMachine_Output_Task(void* arguments) {
         if (StateMachine_GetState() == BUZZER || StateMachine_GetState() == READY_TO_DRIVE) {
             HAL_GPIO_WritePin(Left_Inverter_Enable_GPIO_Port, Left_Inverter_Enable_Pin, GPIO_PIN_SET);
             HAL_GPIO_WritePin(Right_Inverter_Enable_GPIO_Port, Right_Inverter_Enable_Pin, GPIO_PIN_SET);
-            __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, htim11.Init.Period);
-            __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, htim12.Init.Period);
         } else {
             HAL_GPIO_WritePin(Left_Inverter_Enable_GPIO_Port, Left_Inverter_Enable_Pin, GPIO_PIN_RESET);
             HAL_GPIO_WritePin(Right_Inverter_Enable_GPIO_Port, Right_Inverter_Enable_Pin, GPIO_PIN_RESET);
@@ -105,7 +103,7 @@ void StateMachine_Output_Task(void* arguments) {
             }
 
             float pumpDutyCycle = inverterDutyCycle > motorDutyCycle ? inverterDutyCycle : motorDutyCycle;
-            // __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, (uint32_t)(htim11.Init.Period * pumpDutyCycle));
+            __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, (uint32_t)(htim11.Init.Period * pumpDutyCycle));
 
             tempA = (float)InverterRRDataGet(INVERTER_POWER_MODULE_A_TEMP).data / 10.0f;
             tempB = (float)InverterRRDataGet(INVERTER_POWER_MODULE_B_TEMP).data / 10.0f;
@@ -132,10 +130,10 @@ void StateMachine_Output_Task(void* arguments) {
             }
 
             pumpDutyCycle = inverterDutyCycle > motorDutyCycle ? inverterDutyCycle : motorDutyCycle;
-            // __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, (uint32_t)(htim12.Init.Period * pumpDutyCycle));
+            __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, (uint32_t)(htim12.Init.Period * pumpDutyCycle));
         } else {
-            // __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, 0);
-            // __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 0);
+            __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, 0);
+            __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 0);
         }
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(STATEMACHINE_OUTPUT_TASK_INTERVAL));

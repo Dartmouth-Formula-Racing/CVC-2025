@@ -226,12 +226,10 @@ void Torque_LimitTask(void* arguments) {
             maxDischarge = INVERTER_CURRENT_LIMIT;
         }
 
-        // float maxCharge = MAX_REGEN_CURRENT;
-        // if (maxCharge > INVERTER_CURRENT_LIMIT) {
-        //     maxCharge = INVERTER_CURRENT_LIMIT;
-        // }
-        // disable regen for now, set charge limit to 0
-        float maxCharge = 0.0f;
+        float maxCharge = MAX_REGEN_CURRENT;
+        if (maxCharge > INVERTER_CURRENT_LIMIT) {
+            maxCharge = INVERTER_CURRENT_LIMIT;
+        }
 
         float maxBSPD = (MAX_BSPD_POWER * 1000.0f / busVoltage) / 2;
         if (Brake_GetState() == HARD_BRAKE) {
