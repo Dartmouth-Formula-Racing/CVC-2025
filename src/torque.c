@@ -106,9 +106,21 @@ void Torque_CalculateTask(void* arguments) {
         float throttle = Throttle_GetValue();
 
         volatile uint16_t steeringAngleADC = Analogs_ReadChannel(Steering_Angle);
-        steeringAngleADC = steeringAngleADC < STEERING_LEFT_LIMIT ? STEERING_LEFT_LIMIT : steeringAngleADC;
-        steeringAngleADC = steeringAngleADC > STEERING_RIGHT_LIMIT ? STEERING_RIGHT_LIMIT : steeringAngleADC;
-        float steeringAngle = 2.0f * (float)(steeringAngleADC - STEERING_LEFT_LIMIT) / (STEERING_RIGHT_LIMIT - STEERING_LEFT_LIMIT) - 1.0f;
+        // Need to add offset and scaling here because sensor is not quite aligned
+        // steeringAngleADC = steeringAngleADC < STEERING_LEFT_LIMIT ? STEERING_LEFT_LIMIT : steeringAngleADC;
+        // steeringAngleADC = steeringAngleADC > STEERING_RIGHT_LIMIT ? STEERING_RIGHT_LIMIT : steeringAngleADC;
+        // float steeringAngle = 2.0f * (float)(steeringAngleADC - STEERING_LEFT_LIMIT) / (STEERING_RIGHT_LIMIT - STEERING_LEFT_LIMIT) - 1.0f;
+
+        // Unwrap rollover, then clamp and scale to [-1, +1] (+1=left, -1=right)
+        uint32_t steeringUnwrapped = (steeringAngleADC < STEERING_WRAP_POINT)
+                                    ? ((uint32_t)steeringAngleADC + 4096U)
+                                    : (uint32_t)steeringAngleADC;
+
+        steeringUnwrapped = steeringUnwrapped < STEERING_LEFT_LIMIT  ? STEERING_LEFT_LIMIT  : steeringUnwrapped;
+        steeringUnwrapped = steeringUnwrapped > STEERING_RIGHT_LIMIT ? STEERING_RIGHT_LIMIT : steeringUnwrapped;
+
+        volatile float steeringAngle = 1.0f - 2.0f * (float)(steeringUnwrapped - STEERING_LEFT_LIMIT)
+                                / (float)(STEERING_RIGHT_LIMIT - STEERING_LEFT_LIMIT);
 
         rearLeft = throttle * TORQUE_MAX * 10.0;
         rearRight = throttle * TORQUE_MAX * 10.0;
@@ -122,13 +134,14 @@ void Torque_CalculateTask(void* arguments) {
             frontRight *= REVERSE_TORQUE_LIMIT;
         }
 
-        // if (steeringAngle > 0.0f) {
-        //     rearLeft -= TORQUE_VECTORING_GAIN * steeringAngle * rearLeft;
-        //     frontLeft -= TORQUE_VECTORING_GAIN * steeringAngle * frontLeft;
-        // } else {
-        //     rearRight -= TORQUE_VECTORING_GAIN * steeringAngle * rearRight;
-        //     frontRight -= TORQUE_VECTORING_GAIN * steeringAngle * frontRight;
-        // }
+        // Torque Vectoring
+        if (steeringAngle > 0.0f) {
+            rearLeft -= TORQUE_VECTORING_GAIN * steeringAngle * rearLeft;
+            frontLeft -= TORQUE_VECTORING_GAIN * steeringAngle * frontLeft;
+        } else {
+            rearRight -= TORQUE_VECTORING_GAIN * steeringAngle * rearRight;
+            frontRight -= TORQUE_VECTORING_GAIN * steeringAngle * frontRight;
+        }
 
         if (xSemaphoreTake(torqueDataMutex, portMAX_DELAY) == pdTRUE) {
             torqueRearLeft = rearLeft;
@@ -231,10 +244,11 @@ void Torque_LimitTask(void* arguments) {
             maxCharge = INVERTER_CURRENT_LIMIT;
         }
 
-        float maxBSPD = (MAX_BSPD_POWER * 1000.0f / busVoltage) / 2;
-        if (Brake_GetState() == HARD_BRAKE) {
-            maxDischarge = maxBSPD;
-        }
+        // FSAE requirement only - disabled for hybrid, can't exceed 5 kW while braking (don't brake while throttle down)
+        // float maxBSPD = (MAX_BSPD_POWER * 1000.0f / busVoltage) / 2;
+        // if (Brake_GetState() == HARD_BRAKE) {
+        //     maxDischarge = maxBSPD;
+        // }
 
         CAN_Frame Frame = {0};
 

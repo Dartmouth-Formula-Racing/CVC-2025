@@ -13,8 +13,11 @@
 #define RIGHT_MOTOR_ENABLE 1  // Right motor enable bit
 
 #define TORQUE_VECTORING_GAIN 0.70  // Gain for torque vectoring
-#define STEERING_LEFT_LIMIT 820
-#define STEERING_RIGHT_LIMIT 3277
+// Cursed Wrapping Limits
+#define STEERING_LEFT_LIMIT   3559U
+#define STEERING_RIGHT_LIMIT  6286U   // 2190 + 4096
+#define STEERING_WRAP_POINT   3000U   // threshold between 2579 and 3559
+
 
 #define TORQUE_CONSTANT 0.32                // Nm/Arms
 #define RPM_TO_RADS 0.1047197551            // 2 * pi / 60
