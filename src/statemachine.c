@@ -37,8 +37,6 @@ void StateMachine_Task(void* arguments) {
     bool driveLockout = true;  // Locks out drive/reverse until neutral is pressed
     TickType_t buzzerStartTime = xTaskGetTickCount();
     TickType_t lastWakeTime = xTaskGetTickCount();
-    volatile bool mcuContactor1Closed;
-    volatile bool mcuContactor2Closed;
 
     while (1) {
         TickType_t now = xTaskGetTickCount();
@@ -46,10 +44,6 @@ void StateMachine_Task(void* arguments) {
         if (driveLockout && HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
             driveLockout = false;
         }
-
-        // debugging checks for contactor states
-        mcuContactor1Closed = HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin);
-        mcuContactor2Closed = HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin);
 
         switch (state) {
             case WAIT_FOR_PRECHARGE:

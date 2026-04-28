@@ -39,6 +39,11 @@ void WheelSpeeds_Init(void) {
         Error_Handler();
     }
 
+    HAL_TIM_Base_Start(&htim1);
+    HAL_TIM_Base_Start(&htim3);
+    HAL_TIM_Base_Start(&htim4);
+    HAL_TIM_Base_Start(&htim8);
+
     TaskHandle_t handle = xTaskCreateStatic(WheelSpeeds_Task, WHEEL_SPEEDS_TASK_NAME, WHEEL_SPEEDS_TASK_STACK_SIZE, NULL, WHEEL_SPEEDS_TASK_PRIORITY,
                                             wheelSpeedsTaskStack, &wheelSpeedsTaskTCB);
     if (handle == NULL) {
