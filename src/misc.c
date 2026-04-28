@@ -17,8 +17,8 @@
 #include <tasks.h>
 #include <throttle.h>
 
-static StaticTask_t stateMachineOutputTaskTCB;
-static StackType_t stateMachineOutputTaskStack[STATEMACHINE_OUTPUT_TASK_STACK_SIZE];
+// static StaticTask_t stateMachineOutputTaskTCB;
+// static StackType_t stateMachineOutputTaskStack[STATEMACHINE_OUTPUT_TASK_STACK_SIZE];
 static StaticTask_t BrakeTaskTCB;
 static StackType_t BrakeTaskStack[BRAKE_LIGHT_TASK_STACK_SIZE];
 static StaticTask_t DashboardBroadcastTaskTCB;
@@ -29,16 +29,17 @@ static Brake_State brakeState = RELEASED;
 extern TIM_HandleTypeDef htim11;
 extern TIM_HandleTypeDef htim12;
 
-void StateMachine_Output_Task(void* arguments);
+// void StateMachine_Output_Task(void* arguments);
 void Brake_Task(void* arguments);
 void Dashboard_Broadcast_Task(void* arguments);
 
 void Misc_Init(void) {
-    TaskHandle_t handle = xTaskCreateStatic(StateMachine_Output_Task, STATEMACHINE_OUTPUT_TASK_NAME, STATEMACHINE_OUTPUT_TASK_STACK_SIZE, NULL,
-                                            STATEMACHINE_OUTPUT_TASK_PRIORITY, stateMachineOutputTaskStack, &stateMachineOutputTaskTCB);
-    if (handle == NULL) {
-        Error_Handler();
-    }
+    // TaskHandle_t handle = xTaskCreateStatic(StateMachine_Output_Task, STATEMACHINE_OUTPUT_TASK_NAME, STATEMACHINE_OUTPUT_TASK_STACK_SIZE, NULL,
+    //                                         STATEMACHINE_OUTPUT_TASK_PRIORITY, stateMachineOutputTaskStack, &stateMachineOutputTaskTCB);
+    // if (handle == NULL) {
+    //     Error_Handler();
+    // }
+    TaskHandle_t handle;
     handle = xTaskCreateStatic(Brake_Task, BRAKE_LIGHT_TASK_NAME, BRAKE_LIGHT_TASK_STACK_SIZE, NULL, BRAKE_LIGHT_TASK_PRIORITY, BrakeTaskStack, &BrakeTaskTCB);
     if (handle == NULL) {
         Error_Handler();
@@ -54,6 +55,7 @@ void Misc_Init(void) {
     }
 }
 
+/*
 void StateMachine_Output_Task(void* arguments) {
     TickType_t lastWakeTime = xTaskGetTickCount();
 
@@ -64,8 +66,6 @@ void StateMachine_Output_Task(void* arguments) {
         } else {
             HAL_GPIO_WritePin(Left_Inverter_Enable_GPIO_Port, Left_Inverter_Enable_Pin, GPIO_PIN_RESET);
             HAL_GPIO_WritePin(Right_Inverter_Enable_GPIO_Port, Right_Inverter_Enable_Pin, GPIO_PIN_RESET);
-            __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, 0);
-            __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 0);
         }
 
         if (StateMachine_GetDriveState() != NEUTRAL) {
@@ -131,6 +131,7 @@ void StateMachine_Output_Task(void* arguments) {
 
             pumpDutyCycle = inverterDutyCycle > motorDutyCycle ? inverterDutyCycle : motorDutyCycle;
             __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, (uint32_t)(htim12.Init.Period * pumpDutyCycle));
+            __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, htim12.Init.Period);
         } else {
             __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, 0);
             __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_1, 0);
@@ -139,6 +140,7 @@ void StateMachine_Output_Task(void* arguments) {
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(STATEMACHINE_OUTPUT_TASK_INTERVAL));
     }
 }
+*/
 
 void Brake_Task(void* arguments) {
     TickType_t lastWakeTime = xTaskGetTickCount();

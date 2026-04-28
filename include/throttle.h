@@ -8,7 +8,7 @@
 #ifndef CVC_THROTTLE_H
 #define CVC_THROTTLE_H
 
-#define APPS1_MIN 2070
+#define APPS1_MIN 2195
 #define APPS1_MAX 3020
 
 #define APPS2_MIN 40
