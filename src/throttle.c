@@ -71,18 +71,18 @@ void Throttle_Task(void* arguments) {
         } else {
             throttleValid = false;
         }
-        // bypass min valid time for testing
-        // if (instantValid) {
-        //      throttleValid = true;
-        // }
 
-        // if (!plausibilityCheck) {  // EV.4.7.1
-        //     if (apps1 < 0.05) {
-        //         plausibilityCheck = true;
-        //     }
-        // } else if (apps1 > 0.25 && Brake_GetState() == HARD_BRAKE) {
-        //     plausibilityCheck = false;
-        // }
+        if (instantValid) {
+             throttleValid = true;
+        }
+
+        if (!plausibilityCheck) {  // EV.4.7.1
+            if (apps1 < 0.05) {
+                plausibilityCheck = true;
+            }
+        } else if (apps1 > 0.25 && Brake_GetState() == HARD_BRAKE) {
+            plausibilityCheck = false;
+        }
 
         if (!plausibilityCheck) {
             plausibilityCheck = true;  // Only applies for FSAE, skip for FH&E
