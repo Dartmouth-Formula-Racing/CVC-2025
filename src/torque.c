@@ -103,7 +103,9 @@ void Torque_CalculateTask(void* arguments) {
         float frontLeft = 0.0f;
         float frontRight = 0.0f;
 
-        float throttle = Throttle_GetValue();
+        DriveState driveState = StateMachine_GetDriveState();
+        // Pedal position only produces torque in drive or reverse, never in neutral
+        float throttle = (driveState == NEUTRAL) ? 0.0f : Throttle_GetValue();
 
         volatile uint16_t steeringAngleADC = Analogs_ReadChannel(Steering_Angle);
         // Need to add offset and scaling here because sensor is not quite aligned
@@ -127,7 +129,7 @@ void Torque_CalculateTask(void* arguments) {
         frontLeft = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
         frontRight = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
 
-        if (StateMachine_GetDriveState() == REVERSE) {
+        if (driveState == REVERSE) {
             rearLeft *= REVERSE_TORQUE_LIMIT;
             rearRight *= REVERSE_TORQUE_LIMIT;
             frontLeft *= REVERSE_TORQUE_LIMIT;
@@ -178,11 +180,14 @@ void Torque_CommandTask(void* arguments) {
         RRFrame.header.tx.RTR = CAN_RTR_DATA;
         RRFrame.header.tx.DLC = 8;
 
-        // Torque command
-        RLFrame.data[0] = (uint8_t)((int16_t)torqueValues.rearLeft & 0xFF);
-        RLFrame.data[1] = (uint8_t)(((int16_t)torqueValues.rearLeft >> 8) & 0xFF);
-        RRFrame.data[0] = (uint8_t)((int16_t)torqueValues.rearRight & 0xFF);
-        RRFrame.data[1] = (uint8_t)(((int16_t)torqueValues.rearRight >> 8) & 0xFF);
+        // Torque command, held at zero in neutral so the pedal cannot command torque
+        int16_t torqueRL = (driveState == NEUTRAL) ? 0 : (int16_t)torqueValues.rearLeft;
+        int16_t torqueRR = (driveState == NEUTRAL) ? 0 : (int16_t)torqueValues.rearRight;
+
+        RLFrame.data[0] = (uint8_t)(torqueRL & 0xFF);
+        RLFrame.data[1] = (uint8_t)((torqueRL >> 8) & 0xFF);
+        RRFrame.data[0] = (uint8_t)(torqueRR & 0xFF);
+        RRFrame.data[1] = (uint8_t)((torqueRR >> 8) & 0xFF);
 
         // Speed command
         RLFrame.data[2] = 0;
@@ -203,7 +208,7 @@ void Torque_CommandTask(void* arguments) {
         RLFrame.data[5] = 0;
         RRFrame.data[5] = 0;
 
-        if ((driveState != NEUTRAL) && ((int16_t)torqueValues.rearLeft != 0 || (int16_t)torqueValues.rearRight != 0)) {
+        if ((driveState != NEUTRAL) && (torqueRL != 0 || torqueRR != 0)) {
             // Enable inverters
             RLFrame.data[5] |= 0x01;  // Enable left inverter
             RRFrame.data[5] |= 0x01;  // Enable right inverter

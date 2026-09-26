@@ -71,29 +71,26 @@ void StateMachine_Task(void* arguments) {
                     break;
                 }
 
+                driveState = NEUTRAL;
+                requestedDriveState = NEUTRAL;
+
                 // Check if drive lockout is active
                 if (driveLockout) {
                     state = NOT_READY_TO_DRIVE;
-                    driveState = NEUTRAL;  // Reset drive state to neutral
                     break;
                 }
 
                 // Check if throttle is valid and under threshold
                 if (!Throttle_Valid() || Throttle_GetValue() > MAX_RTD_THROTTLE) {
                     state = NOT_READY_TO_DRIVE;
-                    driveState = NEUTRAL;  // Reset drive state to neutral
                     break;
                 }
-
-                requestedDriveState = NEUTRAL;
 
                 // Check if drive button is pressed
                 if (HAL_GPIO_ReadPin(Drive_Button_GPIO_Port, Drive_Button_Pin) == GPIO_PIN_RESET) {
                     // Transition to BUZZER state
                     state = BUZZER;
-                    driveState = NEUTRAL;
                     requestedDriveState = DRIVE;
-                    driveLockout = true;  // Re-enable drive lockout
                     buzzerStartTime = xTaskGetTickCount();
                     break;
                 }
@@ -108,8 +105,6 @@ void StateMachine_Task(void* arguments) {
                     } else {
                         requestedDriveState = DRIVE;  // If reverse is not allowed, treat it as drive
                     }
-                    driveState = NEUTRAL;
-                    driveLockout = true;  // Re-enable drive lockout
                     buzzerStartTime = xTaskGetTickCount();
                     break;
                 }
@@ -149,6 +144,7 @@ void StateMachine_Task(void* arguments) {
                 // Turn on buzzer
                 if (now - buzzerStartTime >= BUZZER_TIME) {
                     state = READY_TO_DRIVE;
+                    driveLockout = true;  // Re-arm lockout so leaving drive requires a neutral press
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                 } else {
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_SET);
