@@ -89,11 +89,14 @@ void Throttle_Task(void* arguments) {
         }
 
         if (xSemaphoreTake(throttleMutex, portMAX_DELAY) == pdTRUE) {
+            
             if (throttleValid && plausibilityCheck) {
                 throttleValue = apps1;
             } else {
                 throttleValue = 0.0f;
             }
+            
+            throttleValue = apps1;
             xSemaphoreGive(throttleMutex);
         }
 

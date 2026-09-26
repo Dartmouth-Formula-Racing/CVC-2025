@@ -191,12 +191,14 @@ void Torque_CommandTask(void* arguments) {
         RRFrame.data[3] = 0;
 
         // Direction command
+        // Left motor is mounted opposite to the current configuration, so its
+        // direction bit is inverted relative to the right motor.
         if (driveState == REVERSE) {
-            RLFrame.data[4] = 1;  // Reverse left motor
-            RRFrame.data[4] = 0;
+            RLFrame.data[4] = 1;  // Left motor forward in reverse mode
+            RRFrame.data[4] = 1;  // Right motor reverse in reverse mode
         } else {
-            RLFrame.data[4] = 0;
-            RRFrame.data[4] = 1;  // Reverse right motor
+            RLFrame.data[4] = 0;  // Left motor reverse in drive mode
+            RRFrame.data[4] = 0;  // Right motor forward in drive mode
         }
 
         // Inverter enable, discharge, & speed mode bits

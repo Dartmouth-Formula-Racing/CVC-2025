@@ -78,12 +78,14 @@ void StateMachine_Task(void* arguments) {
                     break;
                 }
 
+                
                 // Check if throttle is valid and under threshold
                 if (!Throttle_Valid() || Throttle_GetValue() > MAX_RTD_THROTTLE) {
                     state = NOT_READY_TO_DRIVE;
                     driveState = NEUTRAL;  // Reset drive state to neutral
                     break;
                 }
+                
 
                 requestedDriveState = NEUTRAL;
 
@@ -139,12 +141,14 @@ void StateMachine_Task(void* arguments) {
                     break;
                 }
 
+                
                 // Check if throttle is valid and under threshold
                 if (!Throttle_Valid() || Throttle_GetValue() > MAX_RTD_THROTTLE) {
                     state = NOT_READY_TO_DRIVE;
                     driveState = NEUTRAL;  // Reset drive state to neutral
                     break;
                 }
+                
 
                 // Turn on buzzer
                 if (now - buzzerStartTime >= BUZZER_TIME) {
@@ -179,11 +183,13 @@ void StateMachine_Task(void* arguments) {
                 }
 
                 // Check if throttle is valid
+                
                 if (!Throttle_Valid()) {
                     state = NOT_READY_TO_DRIVE;
                     driveState = NEUTRAL;  // Reset drive state to neutral
                     break;
                 }
+                
 
                 driveState = requestedDriveState;
                 break;
