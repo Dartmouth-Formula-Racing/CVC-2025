@@ -56,18 +56,22 @@ void StateMachine_Task(void* arguments) {
                 // Precharge ends when AIR 2 closes
                 if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_SET) {
                     state = NOT_READY_TO_DRIVE;
+                    requestedDriveState = NEUTRAL;
                 } else if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
                     state = WAIT_FOR_PRECHARGE;
+                    requestedDriveState = NEUTRAL;
                 }
                 break;
             case NOT_READY_TO_DRIVE:
                 // Check if discharged
                 if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
                     state = WAIT_FOR_PRECHARGE;
+                    requestedDriveState = NEUTRAL;
                     break;
                 }
                 if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
                     state = PRECHARGE;
+                    requestedDriveState = NEUTRAL;
                     break;
                 }
 
@@ -75,17 +79,17 @@ void StateMachine_Task(void* arguments) {
                 if (driveLockout) {
                     state = NOT_READY_TO_DRIVE;
                     driveState = NEUTRAL;  // Reset drive state to neutral
+                    requestedDriveState = NEUTRAL;
                     break;
                 }
 
-                
                 // Check if throttle is valid and under threshold
                 if (!Throttle_Valid() || Throttle_GetValue() > MAX_RTD_THROTTLE) {
                     state = NOT_READY_TO_DRIVE;
                     driveState = NEUTRAL;  // Reset drive state to neutral
+                    requestedDriveState = NEUTRAL;
                     break;
                 }
-                
 
                 requestedDriveState = NEUTRAL;
 
@@ -122,12 +126,14 @@ void StateMachine_Task(void* arguments) {
                 if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
                     state = WAIT_FOR_PRECHARGE;
                     driveState = NEUTRAL;
+                    requestedDriveState = NEUTRAL;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
                 }
                 if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
                     state = PRECHARGE;
                     driveState = NEUTRAL;
+                    requestedDriveState = NEUTRAL;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
                 }
@@ -137,18 +143,18 @@ void StateMachine_Task(void* arguments) {
                     // Reset to NOT_READY_TO_DRIVE state
                     state = NOT_READY_TO_DRIVE;
                     driveState = NEUTRAL;
+                    requestedDriveState = NEUTRAL;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
                 }
 
-                
                 // Check if throttle is valid and under threshold
                 if (!Throttle_Valid() || Throttle_GetValue() > MAX_RTD_THROTTLE) {
                     state = NOT_READY_TO_DRIVE;
                     driveState = NEUTRAL;  // Reset drive state to neutral
+                    requestedDriveState = NEUTRAL;
                     break;
                 }
-                
 
                 // Turn on buzzer
                 if (now - buzzerStartTime >= BUZZER_TIME) {
@@ -163,12 +169,14 @@ void StateMachine_Task(void* arguments) {
                 if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
                     state = WAIT_FOR_PRECHARGE;
                     driveState = NEUTRAL;
+                    requestedDriveState = NEUTRAL;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
                 }
                 if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
                     state = PRECHARGE;
                     driveState = NEUTRAL;
+                    requestedDriveState = NEUTRAL;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
                 }
@@ -178,6 +186,7 @@ void StateMachine_Task(void* arguments) {
                     // Reset to NOT_READY_TO_DRIVE state
                     state = NOT_READY_TO_DRIVE;
                     driveState = NEUTRAL;
+                    requestedDriveState = NEUTRAL;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
                 }
@@ -187,9 +196,9 @@ void StateMachine_Task(void* arguments) {
                 if (!Throttle_Valid()) {
                     state = NOT_READY_TO_DRIVE;
                     driveState = NEUTRAL;  // Reset drive state to neutral
+                    requestedDriveState = NEUTRAL;
                     break;
                 }
-                
 
                 driveState = requestedDriveState;
                 break;

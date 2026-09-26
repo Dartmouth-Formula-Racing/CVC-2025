@@ -159,6 +159,7 @@ void Torque_CommandTask(void* arguments) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     while (1) {
         TorqueValues torqueValues = Torque_GetValues();
+        VehicleState vehicleState = StateMachine_GetState();
         DriveState driveState = StateMachine_GetDriveState();
 
         CAN_Frame RLFrame = {0};
@@ -204,13 +205,25 @@ void Torque_CommandTask(void* arguments) {
         // Inverter enable, discharge, & speed mode bits
         RLFrame.data[5] = 0;
         RRFrame.data[5] = 0;
+        bool driveActive = (vehicleState == READY_TO_DRIVE) && (driveState != NEUTRAL);
 
-        if ((driveState != NEUTRAL) && ((int16_t)torqueValues.rearLeft != 0 || (int16_t)torqueValues.rearRight != 0)) {
-            // Enable inverters
-            RLFrame.data[5] |= 0x01;  // Enable left inverter
-            RRFrame.data[5] |= 0x01;  // Enable right inverter
+        if (driveActive) {
+            // Keep the inverters enabled while driving.
+            // If DISABLE_ON_ZERO_THROTTLE is enabled, only keep them enabled when torque is requested.
+            if (!DISABLE_ON_ZERO_THROTTLE || (int16_t)torqueValues.rearLeft != 0 || (int16_t)torqueValues.rearRight != 0) {
+                RLFrame.data[5] |= 0x01;  // Enable left inverter
+                RRFrame.data[5] |= 0x01;  // Enable right inverter
+            }
+        } else {
+            // Explicitly request discharge when not driving so the DC bus can bleed down before the next precharge.
+            RLFrame.data[5] |= 0x02;  // Active discharge left inverter
+            RRFrame.data[5] |= 0x02;  // Active discharge right inverter
+            RLFrame.data[0] = 0;
+            RLFrame.data[1] = 0;
+            RRFrame.data[0] = 0;
+            RRFrame.data[1] = 0;
         }
-        // Other bits are 0, we aren't using active discharge or speed mode
+        // Other bits are 0, we aren't using speed mode
 
         // Commanded torque limit, set to 0 to use EEPROM values
         RLFrame.data[6] = 0;
