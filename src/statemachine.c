@@ -90,6 +90,7 @@ void StateMachine_Task(void* arguments) {
                 if (HAL_GPIO_ReadPin(Drive_Button_GPIO_Port, Drive_Button_Pin) == GPIO_PIN_RESET) {
                     // Transition to BUZZER state
                     state = BUZZER;
+                    Torque_SendInverterFaultClear();
                     requestedDriveState = DRIVE;
                     buzzerStartTime = xTaskGetTickCount();
                     break;
@@ -175,11 +176,11 @@ void StateMachine_Task(void* arguments) {
                 }
 
                 // Check if throttle is valid
-                if (!Throttle_Valid()) {
-                    state = NOT_READY_TO_DRIVE;
-                    driveState = NEUTRAL;  // Reset drive state to neutral
-                    break;
-                }
+                // if (!Throttle_Valid()) {
+                //     state = NOT_READY_TO_DRIVE;
+                //     driveState = NEUTRAL;  // Reset drive state to neutral
+                //     break;
+                // }
 
                 driveState = requestedDriveState;
                 break;

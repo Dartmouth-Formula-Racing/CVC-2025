@@ -66,16 +66,15 @@ void Throttle_Task(void* arguments) {
         }
 
         // Check if throttle has been valid for the minimum time
-        if (instantValid && (xTaskGetTickCount() - throttleValidStart) >= pdMS_TO_TICKS(THROTTLE_MIN_VALID_TIME)) {
-            throttleValid = true;
-        } else {
-            throttleValid = false;
-        }
+        // if (instantValid && (xTaskGetTickCount() - throttleValidStart) >= pdMS_TO_TICKS(THROTTLE_MIN_VALID_TIME)) {
+        //     throttleValid = true;
+        // } else {
+        //     throttleValid = false;
+        // }
 
         if (instantValid) {
-             throttleValid = true;
+            throttleValid = true;
         }
-
         if (!plausibilityCheck) {  // EV.4.7.1
             if (apps1 < 0.05) {
                 plausibilityCheck = true;
