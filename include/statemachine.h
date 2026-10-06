@@ -26,6 +26,18 @@ typedef enum {
     REVERSE,
 } DriveState;
 
+typedef enum {
+    RTD_FAIL_NONE = 0,
+    RTD_FAIL_DRIVE_LOCKOUT,
+    RTD_FAIL_THROTTLE,
+    RTD_FAIL_AIR1_OPEN,
+    RTD_FAIL_AIR2_OPEN,
+    RTD_FAIL_PRECHARGE_TIMEOUT,
+    RTD_FAIL_INVALID_STATE,
+} RTDFailure;
+
+RTDFailure StateMachine_GetLastFailure(void);
+
 void StateMachine_Init(void);
 VehicleState StateMachine_GetState(void);
 DriveState StateMachine_GetDriveState(void);

@@ -21,6 +21,7 @@ void StateMachine_Task(void* arguments);
 static VehicleState state = WAIT_FOR_PRECHARGE;
 static DriveState driveState = NEUTRAL;
 static DriveState requestedDriveState = NEUTRAL;
+static RTDFailure lastFailure = RTD_FAIL_NONE;
 
 static StackType_t stateMachineTaskStack[STATEMACHINE_TASK_STACK_SIZE];
 static StaticTask_t stateMachineTaskTCB;
@@ -64,16 +65,19 @@ void StateMachine_Task(void* arguments) {
                 } else if (now - prechargeStartTime > 10000) {
                     // Precharge timeout after 10 seconds - AIR2 didn't close, return to wait
                     state = WAIT_FOR_PRECHARGE;
+                    lastFailure = RTD_FAIL_PRECHARGE_TIMEOUT;
                 }
                 break;
             case NOT_READY_TO_DRIVE:
                 // Check if discharged
                 if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
                     state = WAIT_FOR_PRECHARGE;
+                    lastFailure = RTD_FAIL_AIR1_OPEN;
                     break;
                 }
                 if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
                     state = PRECHARGE;
+                    lastFailure = RTD_FAIL_AIR2_OPEN;
                     break;
                 }
 
@@ -83,12 +87,14 @@ void StateMachine_Task(void* arguments) {
                 // Check if drive lockout is active
                 if (driveLockout) {
                     state = NOT_READY_TO_DRIVE;
+                    lastFailure = RTD_FAIL_DRIVE_LOCKOUT;
                     break;
                 }
 
                 // Check if throttle is valid and under threshold
                 if (!Throttle_Valid() || Throttle_GetValue() > MAX_RTD_THROTTLE) {
                     state = NOT_READY_TO_DRIVE;
+                    lastFailure = RTD_FAIL_THROTTLE;
                     break;
                 }
 
@@ -122,12 +128,14 @@ void StateMachine_Task(void* arguments) {
                 if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
                     state = WAIT_FOR_PRECHARGE;
                     driveState = NEUTRAL;
+                    lastFailure = RTD_FAIL_AIR1_OPEN;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
                 }
                 if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
                     state = PRECHARGE;
                     driveState = NEUTRAL;
+                    lastFailure = RTD_FAIL_AIR2_OPEN;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
                 }
@@ -144,6 +152,7 @@ void StateMachine_Task(void* arguments) {
                 // Check if throttle is valid and under threshold
                 if (!Throttle_Valid() || Throttle_GetValue() > MAX_RTD_THROTTLE) {
                     state = NOT_READY_TO_DRIVE;
+                    lastFailure = RTD_FAIL_THROTTLE;
                     driveState = NEUTRAL;  // Reset drive state to neutral
                     break;
                 }
@@ -151,6 +160,7 @@ void StateMachine_Task(void* arguments) {
                 // Turn on buzzer
                 if (now - buzzerStartTime >= BUZZER_TIME) {
                     state = READY_TO_DRIVE;
+                    lastFailure = RTD_FAIL_NONE;
                     driveLockout = true;  // Re-arm lockout so leaving drive requires a neutral press
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                 } else {
@@ -162,6 +172,7 @@ void StateMachine_Task(void* arguments) {
                 if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
                     Torque_SendInverterFaultClear();
                     state = WAIT_FOR_PRECHARGE;
+                    lastFailure = RTD_FAIL_AIR1_OPEN;
                     driveState = NEUTRAL;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
@@ -169,6 +180,7 @@ void StateMachine_Task(void* arguments) {
                 if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
                     Torque_SendInverterFaultClear();
                     state = PRECHARGE;
+                    lastFailure = RTD_FAIL_AIR2_OPEN;
                     driveState = NEUTRAL;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
@@ -199,6 +211,7 @@ void StateMachine_Task(void* arguments) {
                 driveState = NEUTRAL;
                 requestedDriveState = NEUTRAL;
                 driveLockout = true;
+                lastFailure = RTD_FAIL_INVALID_STATE;
                 break;
         }
 
@@ -244,5 +257,6 @@ void StateMachine_Task(void* arguments) {
     }
 }
 
+RTDFailure StateMachine_GetLastFailure(void) { return lastFailure; }
 VehicleState StateMachine_GetState(void) { return state; }
 DriveState StateMachine_GetDriveState(void) { return driveState; }

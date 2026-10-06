@@ -169,25 +169,63 @@ void Brake_Task(void* arguments) {
 
 Brake_State Brake_GetState(void) { return brakeState; }
 
-void Dashboard_Broadcast_Task(void* arguments) {
+void Dashboard_Broadcast_Task(void* arguments)
+{
     TickType_t lastWakeTime = xTaskGetTickCount();
 
-    while (1) {
+    while (1)
+    {
         CAN_Frame frame = {0};
+
+        CAN_Parse_EMUS_BatteryVoltageOverallParameters();
+        CAN_Parse_EMUS_StateOfChargeParameters();
+
+        CAN_Parse_Inverter_Temp1(RL);
+        CAN_Parse_Inverter_Temp1(RR);
+
+        CAN_Parse_Inverter_Temp3TorqueShudder(RL);
+        CAN_Parse_Inverter_Temp3TorqueShudder(RR);
+
+
+        // ---------------------------------------------------------
+        // 0x750 - Vehicle state / safety / RTD failure
+        // ---------------------------------------------------------
+
         frame.header.tx.StdId = Dashboard_STD(0);
         frame.header.tx.IDE = CAN_ID_STD;
         frame.header.tx.RTR = CAN_RTR_DATA;
         frame.header.tx.DLC = 8;
         frame.header.tx.TransmitGlobalTime = DISABLE;
-        frame.data[0] = HAL_GPIO_ReadPin(MCU_BMS_OK_GPIO_Port, MCU_BMS_OK_Pin) == GPIO_PIN_SET;
-        frame.data[1] = HAL_GPIO_ReadPin(MCU_IMD_OK_GPIO_Port, MCU_IMD_OK_Pin) == GPIO_PIN_SET;
-        frame.data[2] = HAL_GPIO_ReadPin(MCU_BSPD_OK_GPIO_Port, MCU_BSPD_OK_Pin) == GPIO_PIN_SET;
-        frame.data[3] = HAL_GPIO_ReadPin(MCU_BSPD_Instant_GPIO_Port, MCU_BSPD_Instant_Pin) == GPIO_PIN_SET;
+
+        frame.data[0] =
+            HAL_GPIO_ReadPin(MCU_BMS_OK_GPIO_Port,
+                             MCU_BMS_OK_Pin) == GPIO_PIN_SET;
+
+        frame.data[1] =
+            HAL_GPIO_ReadPin(MCU_IMD_OK_GPIO_Port,
+                             MCU_IMD_OK_Pin) == GPIO_PIN_SET;
+
+        frame.data[2] =
+            HAL_GPIO_ReadPin(MCU_BSPD_OK_GPIO_Port,
+                             MCU_BSPD_OK_Pin) == GPIO_PIN_SET;
+
+        frame.data[3] =
+            HAL_GPIO_ReadPin(MCU_BSPD_Instant_GPIO_Port,
+                             MCU_BSPD_Instant_Pin) == GPIO_PIN_SET;
+
         frame.data[4] = (uint8_t)StateMachine_GetDriveState();
         frame.data[5] = (uint8_t)StateMachine_GetState();
-        frame.data[6] = 0;
+        frame.data[6] = (uint8_t)StateMachine_GetLastFailure();
         frame.data[7] = 0;
+
         CAN_SendFrame(BUS1, &frame);
+
+
+        // ---------------------------------------------------------
+        // 0x751 - Driving data
+        // ---------------------------------------------------------
+
+        frame = (CAN_Frame){0};
 
         frame.header.tx.StdId = Dashboard_STD(1);
         frame.header.tx.IDE = CAN_ID_STD;
@@ -195,20 +233,156 @@ void Dashboard_Broadcast_Task(void* arguments) {
         frame.header.tx.DLC = 8;
         frame.header.tx.TransmitGlobalTime = DISABLE;
 
-        int16_t avg_rpm = 0;     // TODO: Implement wheel speed sensing
-        int16_t efficiency = 0;  // TODO: Implement efficiency calculation
-        uint16_t odometer = 0;   // TODO: Implement odometer calculation
+        int16_t avg_rpm = 0;
+        int16_t efficiency = 0;
+        uint16_t odometer = 0;
 
-        frame.data[0] = ((uint16_t)(Throttle_GetValue() * 1000.0f) >> 8) & 0xFF;
-        frame.data[1] = ((uint16_t)(Throttle_GetValue() * 1000.0f) & 0xFF);
+        uint16_t throttle =
+            (uint16_t)(Throttle_GetValue() * 1000.0f);
+
+        frame.data[0] = (throttle >> 8) & 0xFF;
+        frame.data[1] = throttle & 0xFF;
+
         frame.data[2] = (avg_rpm >> 8) & 0xFF;
         frame.data[3] = avg_rpm & 0xFF;
+
         frame.data[4] = (efficiency >> 8) & 0xFF;
         frame.data[5] = efficiency & 0xFF;
+
         frame.data[6] = (odometer >> 8) & 0xFF;
         frame.data[7] = odometer & 0xFF;
+
         CAN_SendFrame(BUS1, &frame);
 
-        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(DASHBOARD_BROADCAST_TASK_INTERVAL));
+
+        // ---------------------------------------------------------
+        // 0x752 - Battery
+        //
+        // 0-1: pack voltage, 0.01 V
+        // 2-3: pack current, signed 0.1 A
+        // 4:   SOC, %
+        // 5:   SOH, %
+        // 6-7: reserved
+        // ---------------------------------------------------------
+
+        frame = (CAN_Frame){0};
+
+        frame.header.tx.StdId = Dashboard_STD(2);
+        frame.header.tx.IDE = CAN_ID_STD;
+        frame.header.tx.RTR = CAN_RTR_DATA;
+        frame.header.tx.DLC = 8;
+        frame.header.tx.TransmitGlobalTime = DISABLE;
+
+        uint32_t packVoltageRaw =
+            BMSDataGet(BMS_TOTAL_VOLTAGE).data;
+
+        int16_t packCurrentRaw =
+            (int16_t)BMSDataGet(BMS_CURRENT).data;
+
+        uint8_t soc =
+            (uint8_t)BMSDataGet(BMS_ESTIMATED_SOC).data;
+
+        uint8_t soh =
+            (uint8_t)BMSDataGet(BMS_ESTIMATED_SOH).data;
+
+        uint16_t packVoltage = (uint16_t)packVoltageRaw;
+
+        frame.data[0] = (packVoltage >> 8) & 0xFF;
+        frame.data[1] = packVoltage & 0xFF;
+
+        frame.data[2] = ((uint16_t)packCurrentRaw >> 8) & 0xFF;
+        frame.data[3] = (uint16_t)packCurrentRaw & 0xFF;
+
+        frame.data[4] = soc;
+        frame.data[5] = soh;
+        frame.data[6] = 0;
+        frame.data[7] = 0;
+
+        CAN_SendFrame(BUS1, &frame);
+
+
+        // ---------------------------------------------------------
+        // 0x753 - Powertrain temperatures
+        //
+        // All temperatures are signed, 0.1 C
+        //
+        // 0-1: left motor
+        // 2-3: left inverter max module temp
+        // 4-5: right motor
+        // 6-7: right inverter max module temp
+        // ---------------------------------------------------------
+
+        frame = (CAN_Frame){0};
+
+        frame.header.tx.StdId = Dashboard_STD(3);
+        frame.header.tx.IDE = CAN_ID_STD;
+        frame.header.tx.RTR = CAN_RTR_DATA;
+        frame.header.tx.DLC = 8;
+        frame.header.tx.TransmitGlobalTime = DISABLE;
+
+        int16_t motorLeft =
+            (int16_t)InverterRLDataGet(INVERTER_MOTOR_TEMP).data;
+
+        int16_t motorRight =
+            (int16_t)InverterRRDataGet(INVERTER_MOTOR_TEMP).data;
+
+
+        int16_t invLeftA =
+            (int16_t)InverterRLDataGet(INVERTER_POWER_MODULE_A_TEMP).data;
+
+        int16_t invLeftB =
+            (int16_t)InverterRLDataGet(INVERTER_POWER_MODULE_B_TEMP).data;
+
+        int16_t invLeftC =
+            (int16_t)InverterRLDataGet(INVERTER_POWER_MODULE_C_TEMP).data;
+
+
+        int16_t invRightA =
+            (int16_t)InverterRRDataGet(INVERTER_POWER_MODULE_A_TEMP).data;
+
+        int16_t invRightB =
+            (int16_t)InverterRRDataGet(INVERTER_POWER_MODULE_B_TEMP).data;
+
+        int16_t invRightC =
+            (int16_t)InverterRRDataGet(INVERTER_POWER_MODULE_C_TEMP).data;
+
+
+        int16_t inverterLeft = invLeftA;
+
+        if (invLeftB > inverterLeft)
+            inverterLeft = invLeftB;
+
+        if (invLeftC > inverterLeft)
+            inverterLeft = invLeftC;
+
+
+        int16_t inverterRight = invRightA;
+
+        if (invRightB > inverterRight)
+            inverterRight = invRightB;
+
+        if (invRightC > inverterRight)
+            inverterRight = invRightC;
+
+
+        frame.data[0] = ((uint16_t)motorLeft >> 8) & 0xFF;
+        frame.data[1] = (uint16_t)motorLeft & 0xFF;
+
+        frame.data[2] = ((uint16_t)inverterLeft >> 8) & 0xFF;
+        frame.data[3] = (uint16_t)inverterLeft & 0xFF;
+
+        frame.data[4] = ((uint16_t)motorRight >> 8) & 0xFF;
+        frame.data[5] = (uint16_t)motorRight & 0xFF;
+
+        frame.data[6] = ((uint16_t)inverterRight >> 8) & 0xFF;
+        frame.data[7] = (uint16_t)inverterRight & 0xFF;
+
+        CAN_SendFrame(BUS1, &frame);
+
+
+        vTaskDelayUntil(
+            &lastWakeTime,
+            pdMS_TO_TICKS(DASHBOARD_BROADCAST_TASK_INTERVAL)
+        );
     }
 }
