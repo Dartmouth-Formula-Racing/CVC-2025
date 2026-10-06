@@ -36,7 +36,9 @@ void StateMachine_Init(void) {
 void StateMachine_Task(void* arguments) {
     bool driveLockout = true;  // Locks out drive/reverse until neutral is pressed
     TickType_t buzzerStartTime = xTaskGetTickCount();
+    TickType_t prechargeStartTime = xTaskGetTickCount();
     TickType_t lastWakeTime = xTaskGetTickCount();
+    VehicleState lastState = state;
 
     while (1) {
         TickType_t now = xTaskGetTickCount();
@@ -50,6 +52,7 @@ void StateMachine_Task(void* arguments) {
                 // Precharge starts when AIR 1 closes
                 if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_SET) {
                     state = PRECHARGE;
+                    prechargeStartTime = xTaskGetTickCount();
                 }
                 break;
             case PRECHARGE:
@@ -57,6 +60,9 @@ void StateMachine_Task(void* arguments) {
                 if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_SET) {
                     state = NOT_READY_TO_DRIVE;
                 } else if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
+                    state = WAIT_FOR_PRECHARGE;
+                } else if (now - prechargeStartTime > 10000) {
+                    // Precharge timeout after 10 seconds - AIR2 didn't close, return to wait
                     state = WAIT_FOR_PRECHARGE;
                 }
                 break;
@@ -152,14 +158,16 @@ void StateMachine_Task(void* arguments) {
                 }
                 break;
             case READY_TO_DRIVE:
-                // Check if discharged
+                // Check if discharged - immediately disable inverters on contactor open (TS-off)
                 if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
+                    Torque_SendInverterFaultClear();
                     state = WAIT_FOR_PRECHARGE;
                     driveState = NEUTRAL;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
                 }
                 if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
+                    Torque_SendInverterFaultClear();
                     state = PRECHARGE;
                     driveState = NEUTRAL;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
@@ -193,6 +201,14 @@ void StateMachine_Task(void* arguments) {
                 driveLockout = true;
                 break;
         }
+
+        // Check if state changed and send inverter fault clear on state transitions
+        // This ensures inverters are properly reset when exiting READY_TO_DRIVE
+        if (lastState != state && lastState == READY_TO_DRIVE && state != READY_TO_DRIVE) {
+            // Transitioning out of READY_TO_DRIVE state, ensure inverters are disabled
+            Torque_SendInverterFaultClear();
+        }
+        lastState = state;
 
         // TEST ONLY: direct drive-state selection from buttons, bypassing the normal drive gating logic above.
         // if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
