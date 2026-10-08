@@ -380,6 +380,35 @@ void Dashboard_Broadcast_Task(void* arguments)
         CAN_SendFrame(BUS1, &frame);
 
 
+        // ---------------------------------------------------------
+        // 0x754 - AIR status
+        //
+        // 0 = open, 1 = closed
+        // 0: AIR1 closed status
+        // 1: AIR2 closed status
+        // 2-7: reserved
+        // ---------------------------------------------------------
+
+        frame = (CAN_Frame){0};
+
+        frame.header.tx.StdId = Dashboard_STD(4);
+        frame.header.tx.IDE = CAN_ID_STD;
+        frame.header.tx.RTR = CAN_RTR_DATA;
+        frame.header.tx.DLC = 8;
+        frame.header.tx.TransmitGlobalTime = DISABLE;
+
+        frame.data[0] = (uint8_t)CVCDataGet(CVC_AIR_1_STATE).data;
+        frame.data[1] = (uint8_t)CVCDataGet(CVC_AIR_2_STATE).data;
+        frame.data[2] = 0;
+        frame.data[3] = 0;
+        frame.data[4] = 0;
+        frame.data[5] = 0;
+        frame.data[6] = 0;
+        frame.data[7] = 0;
+
+        CAN_SendFrame(BUS1, &frame);
+
+
         vTaskDelayUntil(
             &lastWakeTime,
             pdMS_TO_TICKS(DASHBOARD_BROADCAST_TASK_INTERVAL)

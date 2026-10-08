@@ -6,6 +6,7 @@
  */
 
 #include <FreeRTOS.h>
+#include <data.h>
 #include <main.h>
 #include <parse.h>
 #include <semphr.h>
@@ -43,6 +44,11 @@ void StateMachine_Task(void* arguments) {
 
     while (1) {
         TickType_t now = xTaskGetTickCount();
+        bool air1Closed = HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_SET;
+        bool air2Closed = HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_SET;
+
+        CVCDataSet(CVC_AIR_1_STATE, air1Closed);
+        CVCDataSet(CVC_AIR_2_STATE, air2Closed);
 
         if (driveLockout && HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
             driveLockout = false;
@@ -51,16 +57,16 @@ void StateMachine_Task(void* arguments) {
         switch (state) {
             case WAIT_FOR_PRECHARGE:
                 // Precharge starts when AIR 1 closes
-                if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_SET) {
+                if (air1Closed) {
                     state = PRECHARGE;
                     prechargeStartTime = xTaskGetTickCount();
                 }
                 break;
             case PRECHARGE:
                 // Precharge ends when AIR 2 closes
-                if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_SET) {
+                if (air2Closed) {
                     state = NOT_READY_TO_DRIVE;
-                } else if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
+                } else if (!air1Closed) {
                     state = WAIT_FOR_PRECHARGE;
                 } else if (now - prechargeStartTime > 10000) {
                     // Precharge timeout after 10 seconds - AIR2 didn't close, return to wait
@@ -70,12 +76,12 @@ void StateMachine_Task(void* arguments) {
                 break;
             case NOT_READY_TO_DRIVE:
                 // Check if discharged
-                if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
+                if (!air1Closed) {
                     state = WAIT_FOR_PRECHARGE;
                     lastFailure = RTD_FAIL_AIR1_OPEN;
                     break;
                 }
-                if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
+                if (!air2Closed) {
                     state = PRECHARGE;
                     lastFailure = RTD_FAIL_AIR2_OPEN;
                     break;
@@ -125,14 +131,14 @@ void StateMachine_Task(void* arguments) {
                 break;
             case BUZZER:
                 // Check if discharged
-                if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
+                if (!air1Closed) {
                     state = WAIT_FOR_PRECHARGE;
                     driveState = NEUTRAL;
                     lastFailure = RTD_FAIL_AIR1_OPEN;
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
                 }
-                if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
+                if (!air2Closed) {
                     state = PRECHARGE;
                     driveState = NEUTRAL;
                     lastFailure = RTD_FAIL_AIR2_OPEN;
@@ -169,7 +175,7 @@ void StateMachine_Task(void* arguments) {
                 break;
             case READY_TO_DRIVE:
                 // Check if discharged - immediately disable inverters on contactor open (TS-off)
-                if (HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_RESET) {
+                if (!air1Closed) {
                     Torque_SendInverterFaultClear();
                     state = WAIT_FOR_PRECHARGE;
                     lastFailure = RTD_FAIL_AIR1_OPEN;
@@ -177,7 +183,7 @@ void StateMachine_Task(void* arguments) {
                     HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
                     break;
                 }
-                if (HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_RESET) {
+                if (!air2Closed) {
                     Torque_SendInverterFaultClear();
                     state = PRECHARGE;
                     lastFailure = RTD_FAIL_AIR2_OPEN;
