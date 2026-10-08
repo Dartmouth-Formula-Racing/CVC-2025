@@ -223,6 +223,11 @@ void Dashboard_Broadcast_Task(void* arguments)
 
         // ---------------------------------------------------------
         // 0x751 - Driving data
+        //
+        // 0-1: average motor speed, rpm
+        // 2-3: efficiency, W/km
+        // 4-5: odometer, m
+        // 6-7: reserved
         // ---------------------------------------------------------
 
         frame = (CAN_Frame){0};
@@ -237,20 +242,17 @@ void Dashboard_Broadcast_Task(void* arguments)
         int16_t efficiency = 0;
         uint16_t odometer = 0;
 
-        uint16_t throttle =
-            (uint16_t)(Throttle_GetValue() * 1000.0f);
+        frame.data[0] = (avg_rpm >> 8) & 0xFF;
+        frame.data[1] = avg_rpm & 0xFF;
 
-        frame.data[0] = (throttle >> 8) & 0xFF;
-        frame.data[1] = throttle & 0xFF;
+        frame.data[2] = (efficiency >> 8) & 0xFF;
+        frame.data[3] = efficiency & 0xFF;
 
-        frame.data[2] = (avg_rpm >> 8) & 0xFF;
-        frame.data[3] = avg_rpm & 0xFF;
+        frame.data[4] = (odometer >> 8) & 0xFF;
+        frame.data[5] = odometer & 0xFF;
 
-        frame.data[4] = (efficiency >> 8) & 0xFF;
-        frame.data[5] = efficiency & 0xFF;
-
-        frame.data[6] = (odometer >> 8) & 0xFF;
-        frame.data[7] = odometer & 0xFF;
+        frame.data[6] = 0;
+        frame.data[7] = 0;
 
         CAN_SendFrame(BUS1, &frame);
 
@@ -403,6 +405,40 @@ void Dashboard_Broadcast_Task(void* arguments)
         frame.data[3] = 0;
         frame.data[4] = 0;
         frame.data[5] = 0;
+        frame.data[6] = 0;
+        frame.data[7] = 0;
+
+        CAN_SendFrame(BUS1, &frame);
+
+
+        // ---------------------------------------------------------
+        // 0x755 - Driver inputs
+        //
+        // 0-1: throttle, 0.001 (0-1000)
+        // 2-3: steering angle, raw ADC counts
+        // 4-5: brake pressure, raw ADC counts
+        // 6-7: reserved
+        // ---------------------------------------------------------
+
+        frame = (CAN_Frame){0};
+
+        frame.header.tx.StdId = Dashboard_STD(5);
+        frame.header.tx.IDE = CAN_ID_STD;
+        frame.header.tx.RTR = CAN_RTR_DATA;
+        frame.header.tx.DLC = 8;
+        frame.header.tx.TransmitGlobalTime = DISABLE;
+
+        uint16_t throttle =
+            (uint16_t)(Throttle_GetValue() * 1000.0f);
+        uint16_t steeringAngleRaw = Analogs_ReadChannel(Steering_Angle);
+        uint16_t brakePressureRaw = Analogs_ReadChannel(Brake_Pressure);
+
+        frame.data[0] = (throttle >> 8) & 0xFF;
+        frame.data[1] = throttle & 0xFF;
+        frame.data[2] = (steeringAngleRaw >> 8) & 0xFF;
+        frame.data[3] = steeringAngleRaw & 0xFF;
+        frame.data[4] = (brakePressureRaw >> 8) & 0xFF;
+        frame.data[5] = brakePressureRaw & 0xFF;
         frame.data[6] = 0;
         frame.data[7] = 0;
 
