@@ -153,10 +153,10 @@ void Brake_Task(void* arguments) {
             lightState = (lightState == GPIO_PIN_SET) ? GPIO_PIN_RESET : GPIO_PIN_SET;
         }
         float brakeValue = Analogs_ReadChannel(Brake_Pressure);
-        if (brakeValue >= HARD_BRAKE_THRESHOLD && brakeValue != ANALOG_INVALID) {
+        if (brakeValue != ANALOG_INVALID && brakeValue >= BRAKE_HARD_THRESHOLD) {
             brakeState = HARD_BRAKE;
             HAL_GPIO_WritePin(Brake_Light_GPIO_Port, Brake_Light_Pin, lightState);
-        } else if (brakeValue >= SOFT_BRAKE_THRESHOLD && brakeValue != ANALOG_INVALID) {
+        } else if (brakeValue != ANALOG_INVALID && brakeValue >= BRAKE_SOFT_THRESHOLD) {
             brakeState = SOFT_BRAKE;
             HAL_GPIO_WritePin(Brake_Light_GPIO_Port, Brake_Light_Pin, GPIO_PIN_SET);
         } else {

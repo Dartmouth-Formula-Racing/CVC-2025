@@ -6,11 +6,16 @@
  */
 
 #define TORQUE_MAX 100.0f           // Max torque at motor (Nm)
-#define REVERSE_TORQUE_LIMIT 0.30f  // Percentage of nominal torque (0.0 - 100.0)
+#define REVERSE_TORQUE_LIMIT 0.30f  // Fraction of nominal torque (0.0 - 100.0)
 #define DISABLE_ON_ZERO_THROTTLE 0  // Disable inverters when throttle is at 0%
 
 #define LEFT_MOTOR_ENABLE 1   // Left motor enable bit
 #define RIGHT_MOTOR_ENABLE 1  // Right motor enable bit
+
+// The rear motors are mounted as mirror images, so the right inverter's
+// direction command must be inverted to make both wheels propel the car alike.
+#define LEFT_MOTOR_DIRECTION_INVERTED 0U
+#define RIGHT_MOTOR_DIRECTION_INVERTED 1U
 
 #define TORQUE_VECTORING_GAIN 0.70  // Gain for torque vectoring
 // Cursed Wrapping Limits
@@ -19,14 +24,12 @@
 #define STEERING_WRAP_POINT   3000U   // threshold between 2579 and 3559
 
 
-#define TORQUE_CONSTANT 0.32                // Nm/Arms
 #define RPM_TO_RADS 0.1047197551            // 2 * pi / 60
 #define INVERTER_CURRENT_LIMIT 270.0        // Amps
-#define BUS_MIN_VOLTAGE 100.0               // Volts
-#define BUS_RESISTANCE 0.275                // Ohms
+#define BUS_MIN_VOLTAGE 100.0               // Volt
 #define TORQUE_COMMAND_SCALE 121.0 / 100.0  // Need to command 121 Nm to inverter to get 100 Nm at motor
 
-#define MAX_POWER 75.0f  // Max total DC bus power (kW)
+#define MAX_POWER 120.0f  // Max total DC bus power (kW)
 
 #define MAX_BSPD_POWER 4.5f  // Max power under hard braking (kW), designed to not trip BSPD
 
