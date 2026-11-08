@@ -49,6 +49,7 @@
 #define InverterRL_EXT(idx) (CAN_INVERTER_BASE_ID1_EXT + (idx))
 #define InverterRR_EXT(idx) (CAN_INVERTER_BASE_ID2_EXT + (idx))
 #define Dashboard_STD(idx) (CAN_DASHBOARD_BASE_STD + (idx))
+#define CAN_STEERING_ANGLE_STD Dashboard_STD(2)
 
 extern SemaphoreHandle_t canMutex;
 

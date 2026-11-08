@@ -12,6 +12,11 @@
 #define LEFT_MOTOR_ENABLE 1   // Left motor enable bit
 #define RIGHT_MOTOR_ENABLE 1  // Right motor enable bit
 
+// The rear motors are mounted as mirror images, so the right inverter's
+// direction command must be inverted to make both wheels propel the car alike.
+#define LEFT_MOTOR_DIRECTION_INVERTED 0U
+#define RIGHT_MOTOR_DIRECTION_INVERTED 1U
+
 #define TORQUE_VECTORING_GAIN 0.70  // Gain for torque vectoring
 // Cursed Wrapping Limits
 #define STEERING_LEFT_LIMIT   3559U
@@ -26,7 +31,7 @@
 #define BUS_RESISTANCE 0.275                // Ohms
 #define TORQUE_COMMAND_SCALE 121.0 / 100.0  // Need to command 121 Nm to inverter to get 100 Nm at motor
 
-#define MAX_POWER 75.0f  // Max total DC bus power (kW)
+#define MAX_POWER 80.0f  // Max total DC bus power (kW)
 
 #define MAX_BSPD_POWER 4.5f  // Max power under hard braking (kW), designed to not trip BSPD
 

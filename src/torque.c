@@ -124,6 +124,17 @@ void Torque_CalculateTask(void* arguments) {
         volatile float steeringAngle = 1.0f - 2.0f * (float)(steeringUnwrapped - STEERING_LEFT_LIMIT)
                                 / (float)(STEERING_RIGHT_LIMIT - STEERING_LEFT_LIMIT);
 
+        CAN_Frame steeringFrame = {0};
+        steeringFrame.header.tx.StdId = CAN_STEERING_ANGLE_STD;
+        steeringFrame.header.tx.IDE = CAN_ID_STD;
+        steeringFrame.header.tx.RTR = CAN_RTR_DATA;
+        steeringFrame.header.tx.DLC = 8;
+
+        int16_t steeringAngleScaled = (int16_t)(steeringAngle * 1000.0f);
+        steeringFrame.data[0] = (uint8_t)(steeringAngleScaled & 0xFF);
+        steeringFrame.data[1] = (uint8_t)(((uint16_t)steeringAngleScaled >> 8) & 0xFF);
+        CAN_SendFrame(BUS1, &steeringFrame);
+
         rearLeft = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
         rearRight = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
         frontLeft = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
@@ -195,20 +206,17 @@ void Torque_CommandTask(void* arguments) {
         RRFrame.data[2] = 0;
         RRFrame.data[3] = 0;
 
-        // Direction command
-        if (driveState == REVERSE) {
-            RLFrame.data[4] = 1;  // Reverse left motor
-            RRFrame.data[4] = 1;  // Match right motor direction to left
-        } else {
-            RLFrame.data[4] = 0;
-            RRFrame.data[4] = 0;  // Match right motor direction to left
-        }
+        // The direction bit is inverter-local. Compensate for each motor's
+        // installation orientation so both wheels propel the car together.
+        uint8_t reverseCommand = (driveState == REVERSE) ? 1U : 0U;
+        RLFrame.data[4] = reverseCommand ^ LEFT_MOTOR_DIRECTION_INVERTED;
+        RRFrame.data[4] = reverseCommand ^ RIGHT_MOTOR_DIRECTION_INVERTED;
 
         // Inverter enable, discharge, & speed mode bits
         RLFrame.data[5] = 0;
         RRFrame.data[5] = 0;
 
-        if ((driveState != NEUTRAL) && (torqueRL != 0 || torqueRR != 0)) {
+        if ((driveState != NEUTRAL) && (torqueRL != 0 || torqueRR != 0 || !DISABLE_ON_ZERO_THROTTLE)) {
             // Enable inverters
             RLFrame.data[5] |= 0x01;  // Enable left inverter
             RRFrame.data[5] |= 0x01;  // Enable right inverter
