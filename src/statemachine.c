@@ -17,6 +17,20 @@
 #include <throttle.h>
 #include <torque.h>
 
+#define DASHBOARD_BUTTON_DEBOUNCE_MS 30U
+
+static bool Dashboard_Button_Debounced(GPIO_TypeDef* port, uint16_t pin, TickType_t* lastChangeTick, bool* rawState) {
+    TickType_t now = xTaskGetTickCount();
+    bool currentState = HAL_GPIO_ReadPin(port, pin) == GPIO_PIN_RESET;
+
+    if (currentState != *rawState) {
+        *rawState = currentState;
+        *lastChangeTick = now;
+    }
+
+    return currentState && (now - *lastChangeTick >= pdMS_TO_TICKS(DASHBOARD_BUTTON_DEBOUNCE_MS));
+}
+
 void StateMachine_Task(void* arguments);
 
 static VehicleState state = WAIT_FOR_PRECHARGE;
@@ -42,15 +56,28 @@ void StateMachine_Task(void* arguments) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     VehicleState lastState = state;
 
+    bool neutralButtonRaw = false;
+    bool driveButtonRaw = false;
+    bool reverseButtonRaw = false;
+    TickType_t neutralButtonLastChange = xTaskGetTickCount();
+    TickType_t driveButtonLastChange = xTaskGetTickCount();
+    TickType_t reverseButtonLastChange = xTaskGetTickCount();
+
     while (1) {
         TickType_t now = xTaskGetTickCount();
         bool air1Closed = HAL_GPIO_ReadPin(MCU_Contactor_1_Closed_GPIO_Port, MCU_Contactor_1_Closed_Pin) == GPIO_PIN_SET;
         bool air2Closed = HAL_GPIO_ReadPin(MCU_Contactor_2_Closed_GPIO_Port, MCU_Contactor_2_Closed_Pin) == GPIO_PIN_SET;
+        bool neutralButtonPressed = Dashboard_Button_Debounced(Neutral_Button_GPIO_Port, Neutral_Button_Pin,
+                                                              &neutralButtonLastChange, &neutralButtonRaw);
+        bool driveButtonPressed = Dashboard_Button_Debounced(Drive_Button_GPIO_Port, Drive_Button_Pin,
+                                                            &driveButtonLastChange, &driveButtonRaw);
+        bool reverseButtonPressed = Dashboard_Button_Debounced(Reverse_Button_GPIO_Port, Reverse_Button_Pin,
+                                                              &reverseButtonLastChange, &reverseButtonRaw);
 
         CVCDataSet(CVC_AIR_1_STATE, air1Closed);
         CVCDataSet(CVC_AIR_2_STATE, air2Closed);
 
-        if (driveLockout && HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
+        if (driveLockout && neutralButtonPressed) {
             driveLockout = false;
         }
 
@@ -105,7 +132,7 @@ void StateMachine_Task(void* arguments) {
                 }
 
                 // Check if drive button is pressed
-                if (HAL_GPIO_ReadPin(Drive_Button_GPIO_Port, Drive_Button_Pin) == GPIO_PIN_RESET) {
+                if (driveButtonPressed) {
                     // Transition to BUZZER state
                     state = BUZZER;
                     Torque_SendInverterFaultClear();
@@ -115,7 +142,7 @@ void StateMachine_Task(void* arguments) {
                 }
 
                 // Check if reverse button is pressed
-                if (HAL_GPIO_ReadPin(Reverse_Button_GPIO_Port, Reverse_Button_Pin) == GPIO_PIN_RESET) {
+                if (reverseButtonPressed) {
                     // Transition to BUZZER state
                     state = BUZZER;
                     Torque_SendInverterFaultClear();
@@ -127,7 +154,6 @@ void StateMachine_Task(void* arguments) {
                     buzzerStartTime = xTaskGetTickCount();
                     break;
                 }
-
                 break;
             case BUZZER:
                 // Check if discharged
@@ -147,7 +173,7 @@ void StateMachine_Task(void* arguments) {
                 }
 
                 // Check if neutral button is pressed, neutral should be able to cancel drive/reverse
-                if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
+                if (neutralButtonPressed) {
                     // Reset to NOT_READY_TO_DRIVE state
                     state = NOT_READY_TO_DRIVE;
                     driveState = NEUTRAL;
@@ -193,7 +219,7 @@ void StateMachine_Task(void* arguments) {
                 }
 
                 // Check if neutral button is pressed
-                if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
+                if (neutralButtonPressed) {
                     // Reset to NOT_READY_TO_DRIVE state
                     state = NOT_READY_TO_DRIVE;
                     driveState = NEUTRAL;
@@ -230,13 +256,13 @@ void StateMachine_Task(void* arguments) {
         lastState = state;
 
         // TEST ONLY: direct drive-state selection from buttons, bypassing the normal drive gating logic above.
-        // if (HAL_GPIO_ReadPin(Neutral_Button_GPIO_Port, Neutral_Button_Pin) == GPIO_PIN_RESET) {
+        // if (neutralButtonPressed) {
         //     driveState = NEUTRAL;
         //     state = NOT_READY_TO_DRIVE;
-        // } else if (HAL_GPIO_ReadPin(Drive_Button_GPIO_Port, Drive_Button_Pin) == GPIO_PIN_RESET) {
+        // } else if (driveButtonPressed) {
         //     driveState = DRIVE;
         //     state = READY_TO_DRIVE;
-        // } else if (HAL_GPIO_ReadPin(Reverse_Button_GPIO_Port, Reverse_Button_Pin) == GPIO_PIN_RESET) {
+        // } else if (reverseButtonPressed) {
         //     if (ALLOW_REVERSE) {
         //         driveState = REVERSE;
         //     } else {
