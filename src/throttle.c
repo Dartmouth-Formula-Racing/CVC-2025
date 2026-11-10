@@ -19,6 +19,32 @@
 static bool throttleValid = false;
 static float throttleValue = 0.0f;
 
+static uint16_t apps1MedianHistory[3] = {0U, 0U, 0U};
+static uint8_t apps1MedianIndex = 0U;
+
+static uint16_t MedianOfThree(uint16_t a, uint16_t b, uint16_t c) {
+    uint16_t sorted[3] = {a, b, c};
+    uint16_t temp = 0U;
+
+    if (sorted[0] > sorted[1]) {
+        temp = sorted[0];
+        sorted[0] = sorted[1];
+        sorted[1] = temp;
+    }
+    if (sorted[1] > sorted[2]) {
+        temp = sorted[1];
+        sorted[1] = sorted[2];
+        sorted[2] = temp;
+    }
+    if (sorted[0] > sorted[1]) {
+        temp = sorted[0];
+        sorted[0] = sorted[1];
+        sorted[1] = temp;
+    }
+
+    return sorted[1];
+}
+
 static SemaphoreHandle_t throttleMutex = NULL;
 static StaticSemaphore_t throttleMutexBuffer;
 
@@ -41,7 +67,6 @@ void Throttle_Init(void) {
 
 void Throttle_Task(void* arguments) {
     TickType_t lastWakeTime = xTaskGetTickCount();
-    TickType_t throttleValidStart = lastWakeTime;
     bool plausibilityCheck = false;
     bool instantValid = false;
     while (1) {
@@ -52,14 +77,18 @@ void Throttle_Task(void* arguments) {
         apps2ADC = apps2ADC < APPS2_MIN ? APPS2_MIN : apps2ADC;
         apps2ADC = apps2ADC > APPS2_MAX ? APPS2_MAX : apps2ADC;
 
-        float apps1 = (float)(apps1ADC - APPS1_MIN) / (APPS1_MAX - APPS1_MIN);
+        apps1MedianHistory[apps1MedianIndex] = apps1ADC;
+        apps1MedianIndex = (apps1MedianIndex + 1U) % 3U;
+
+        uint16_t apps1FilteredADC = MedianOfThree(apps1MedianHistory[0], apps1MedianHistory[1], apps1MedianHistory[2]);
+
+        float apps1 = (float)(apps1FilteredADC - APPS1_MIN) / (APPS1_MAX - APPS1_MIN);
         float apps2 = (float)(apps2ADC - APPS2_MIN) / (APPS2_MAX - APPS2_MIN);
 
         // Check if readings match within tolerance
         if (fabs(apps1 - apps2) < THROTTLE_TOLERANCE) {
             if (!instantValid) {
                 instantValid = true;
-                throttleValidStart = xTaskGetTickCount();
             }
         } else {
             instantValid = false;
