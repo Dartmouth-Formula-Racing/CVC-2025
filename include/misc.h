@@ -16,8 +16,8 @@
 #define PUMP_MIN_DC 0.7
 #define PUMP_MAX_DC 1.0
 
-#define SOFT_BRAKE_THRESHOLD 0.90
-#define HARD_BRAKE_THRESHOLD 1.40
+#define SOFT_BRAKE_THRESHOLD 1082
+#define HARD_BRAKE_THRESHOLD 1600
 #define BRAKE_BLINK_INTERVAL 150
 
 #define GEARBOX_RATIO 4.2
@@ -34,9 +34,6 @@ typedef enum {
     SOFT_BRAKE,
     HARD_BRAKE,
 } Brake_State;
-
-#define BRAKE_SOFT_THRESHOLD 1082
-#define BRAKE_HARD_THRESHOLD 1600
 
 void Misc_Init(void);
 Brake_State Brake_GetState(void);

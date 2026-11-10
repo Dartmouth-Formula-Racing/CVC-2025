@@ -31,7 +31,7 @@
 #define BUS_RESISTANCE 0.275                // Ohms
 #define TORQUE_COMMAND_SCALE (121.0 / 100.0)  // Need to command 121 Nm to inverter to get 100 Nm at motor
 
-#define MAX_POWER 75.0f  // Max total DC bus power (kW)
+#define MAX_POWER 80.0f  // Max total DC bus power (kW)
 
 #define MAX_BSPD_POWER 4.5f  // Max power under hard braking (kW), designed to not trip BSPD
 
