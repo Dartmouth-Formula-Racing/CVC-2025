@@ -148,16 +148,32 @@ void Torque_CalculateTask(void* arguments) {
         // Reduce the inner wheel torque and add the same amount to the outer wheel to generate
         // a yawing moment without changing the total axle torque by more than the vectoring bias.
         const float steeringMagnitude = (steeringAngle > 0.0f) ? steeringAngle : -steeringAngle;
+        float vectoringScale = 0.0f;
+
+        if (steeringMagnitude > TORQUE_VECTORING_DEADBAND) {
+            float normalizedSteering = (steeringMagnitude - TORQUE_VECTORING_DEADBAND) / (1.0f - TORQUE_VECTORING_DEADBAND);
+            if (normalizedSteering > 1.0f) {
+                normalizedSteering = 1.0f;
+            }
+
+            if (TORQUE_VECTORING_CURVE >= 2.0f) {
+                vectoringScale = normalizedSteering * normalizedSteering;
+            } else {
+                vectoringScale = normalizedSteering;
+            }
+        }
+
+        const float vectoringGain = TORQUE_VECTORING_GAIN * vectoringScale;
         if (steeringAngle > 0.0f) {
-            rearLeft -= TORQUE_VECTORING_GAIN * steeringMagnitude * rearLeft;
-            frontLeft -= TORQUE_VECTORING_GAIN * steeringMagnitude * frontLeft;
-            rearRight += TORQUE_VECTORING_GAIN * steeringMagnitude * rearRight;
-            frontRight += TORQUE_VECTORING_GAIN * steeringMagnitude * frontRight;
+            rearLeft -= vectoringGain * rearLeft;
+            frontLeft -= vectoringGain * frontLeft;
+            rearRight += vectoringGain * rearRight;
+            frontRight += vectoringGain * frontRight;
         } else {
-            rearRight -= TORQUE_VECTORING_GAIN * steeringMagnitude * rearRight;
-            frontRight -= TORQUE_VECTORING_GAIN * steeringMagnitude * frontRight;
-            rearLeft += TORQUE_VECTORING_GAIN * steeringMagnitude * rearLeft;
-            frontLeft += TORQUE_VECTORING_GAIN * steeringMagnitude * frontLeft;
+            rearRight -= vectoringGain * rearRight;
+            frontRight -= vectoringGain * frontRight;
+            rearLeft += vectoringGain * rearLeft;
+            frontLeft += vectoringGain * frontLeft;
         }
 
         if (xSemaphoreTake(torqueDataMutex, portMAX_DELAY) == pdTRUE) {

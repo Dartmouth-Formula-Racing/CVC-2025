@@ -16,6 +16,8 @@
 #define RIGHT_MOTOR_DIRECTION_INVERTED 1U
 
 #define TORQUE_VECTORING_GAIN 0.70  // Gain for torque vectoring
+#define TORQUE_VECTORING_DEADBAND 0.06f  // No vectoring effect below this normalized steering magnitude
+#define TORQUE_VECTORING_CURVE 2.0f      // Exponential ramp after deadband (2.0 = quadratic)
 // Cursed Wrapping Limits
 #define STEERING_LEFT_LIMIT   3559U
 #define STEERING_RIGHT_LIMIT  6286U   // 2190 + 4096
