@@ -12,6 +12,9 @@
 #define LEFT_MOTOR_ENABLE 1   // Left motor enable bit
 #define RIGHT_MOTOR_ENABLE 1  // Right motor enable bit
 
+#define LEFT_MOTOR_DIRECTION_INVERTED 0U
+#define RIGHT_MOTOR_DIRECTION_INVERTED 1U
+
 #define TORQUE_VECTORING_GAIN 0.70  // Gain for torque vectoring
 // Cursed Wrapping Limits
 #define STEERING_LEFT_LIMIT   3559U
