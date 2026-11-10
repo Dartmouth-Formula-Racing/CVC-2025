@@ -237,16 +237,30 @@ void Torque_LimitTask(void* arguments) {
         // Bytes [2, 3] - Charge current limit (A)
         // Does not include traction control or torque vectoring yet, assumes even power split
         // Ensure CAN_BMS_Limit_Enable_EEPROM is set to 1
-        float busVoltage = (float)BMSDataGet(BMS_TOTAL_VOLTAGE).data / 100.0f;
+        DataEntry packVoltageEntry = BMSDataGet(BMS_TOTAL_VOLTAGE);
+        const TickType_t now = xTaskGetTickCount();
+        const bool voltageIsFresh = (packVoltageEntry.time != 0U) &&
+                                   ((now - packVoltageEntry.time) <= pdMS_TO_TICKS(BMS_VOLTAGE_STALE_TIMEOUT_MS));
 
-        float maxDischarge = (MAX_POWER * 1000.0f / busVoltage) / 2;
-        if (maxDischarge > INVERTER_CURRENT_LIMIT) {
-            maxDischarge = INVERTER_CURRENT_LIMIT;
+        float busVoltage = 0.0f;
+        float maxDischarge = 0.0f;
+        float maxCharge = 0.0f;
+
+        if (voltageIsFresh && packVoltageEntry.data != 0U) {
+            busVoltage = (float)packVoltageEntry.data / 100.0f;
+            if (busVoltage > 0.0f) {
+                maxDischarge = (MAX_POWER * 1000.0f / busVoltage) / 2;
+                if (maxDischarge > INVERTER_CURRENT_LIMIT) {
+                    maxDischarge = INVERTER_CURRENT_LIMIT;
+                }
+            }
         }
 
-        float maxCharge = MAX_REGEN_CURRENT;
-        if (maxCharge > INVERTER_CURRENT_LIMIT) {
-            maxCharge = INVERTER_CURRENT_LIMIT;
+        if (voltageIsFresh && busVoltage > 0.0f) {
+            maxCharge = MAX_REGEN_CURRENT;
+            if (maxCharge > INVERTER_CURRENT_LIMIT) {
+                maxCharge = INVERTER_CURRENT_LIMIT;
+            }
         }
 
         // FSAE requirement only - disabled for hybrid, can't exceed 5 kW while braking (don't brake while throttle down)

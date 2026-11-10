@@ -186,6 +186,7 @@ void CAN_Parse_EMUS_BatteryVoltageOverallParameters() {
     // Byte 5: Total voltage (MSB)
     BMSData[BMS_TOTAL_VOLTAGE].data = data[5] << 24 | BMSData[BMS_TOTAL_VOLTAGE].data;
     // Byte 7: Don't care
+    BMSData[BMS_TOTAL_VOLTAGE].time = xTaskGetTickCount();
 
     canData[EMUS_BatteryVoltageOverallParameters].parsed = true;
 

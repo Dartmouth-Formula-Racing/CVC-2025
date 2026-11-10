@@ -24,13 +24,14 @@
 #define INVERTER_CURRENT_LIMIT 270.0        // Amps
 #define BUS_MIN_VOLTAGE 100.0               // Volts
 #define BUS_RESISTANCE 0.275                // Ohms
-#define TORQUE_COMMAND_SCALE 121.0 / 100.0  // Need to command 121 Nm to inverter to get 100 Nm at motor
+#define TORQUE_COMMAND_SCALE (121.0 / 100.0)  // Need to command 121 Nm to inverter to get 100 Nm at motor
 
 #define MAX_POWER 75.0f  // Max total DC bus power (kW)
 
 #define MAX_BSPD_POWER 4.5f  // Max power under hard braking (kW), designed to not trip BSPD
 
 #define MAX_REGEN_CURRENT 50  // Max regenerative braking current (A)
+#define BMS_VOLTAGE_STALE_TIMEOUT_MS 1000U  // Reject pack voltage if BMS has been silent for >1 s
 
 typedef struct {
     float rearLeft;
