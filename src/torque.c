@@ -28,6 +28,7 @@ static float torqueRearLeft = 0.0f;
 static float torqueRearRight = 0.0f;
 static float torqueFrontLeft = 0.0f;
 static float torqueFrontRight = 0.0f;
+static float lastValidSteeringAngle = 0.0f;
 static SemaphoreHandle_t torqueDataMutex = NULL;
 static StaticSemaphore_t torqueDataMutexBuffer;
 
@@ -113,16 +114,22 @@ void Torque_CalculateTask(void* arguments) {
         // steeringAngleADC = steeringAngleADC > STEERING_RIGHT_LIMIT ? STEERING_RIGHT_LIMIT : steeringAngleADC;
         // float steeringAngle = 2.0f * (float)(steeringAngleADC - STEERING_LEFT_LIMIT) / (STEERING_RIGHT_LIMIT - STEERING_LEFT_LIMIT) - 1.0f;
 
-        // Unwrap rollover, then clamp and scale to [-1, +1] (+1=left, -1=right)
-        uint32_t steeringUnwrapped = (steeringAngleADC < STEERING_WRAP_POINT)
-                                    ? ((uint32_t)steeringAngleADC + 4096U)
-                                    : (uint32_t)steeringAngleADC;
+        // Hold last valid steering angle in the dead gap to avoid abrupt sign flips
+        // from saturation while crossing the wrapped sensor invalid region.
+        volatile float steeringAngle = lastValidSteeringAngle;
+        if ((steeringAngleADC < STEERING_DEAD_GAP_LOW) || (steeringAngleADC > STEERING_DEAD_GAP_HIGH)) {
+            // Unwrap rollover, then clamp and scale to [-1, +1] (+1=left, -1=right)
+            uint32_t steeringUnwrapped = (steeringAngleADC < STEERING_WRAP_POINT)
+                                        ? ((uint32_t)steeringAngleADC + 4096U)
+                                        : (uint32_t)steeringAngleADC;
 
-        steeringUnwrapped = steeringUnwrapped < STEERING_LEFT_LIMIT  ? STEERING_LEFT_LIMIT  : steeringUnwrapped;
-        steeringUnwrapped = steeringUnwrapped > STEERING_RIGHT_LIMIT ? STEERING_RIGHT_LIMIT : steeringUnwrapped;
+            steeringUnwrapped = steeringUnwrapped < STEERING_LEFT_LIMIT  ? STEERING_LEFT_LIMIT  : steeringUnwrapped;
+            steeringUnwrapped = steeringUnwrapped > STEERING_RIGHT_LIMIT ? STEERING_RIGHT_LIMIT : steeringUnwrapped;
 
-        volatile float steeringAngle = 1.0f - 2.0f * (float)(steeringUnwrapped - STEERING_LEFT_LIMIT)
-                                / (float)(STEERING_RIGHT_LIMIT - STEERING_LEFT_LIMIT);
+            steeringAngle = 1.0f - 2.0f * (float)(steeringUnwrapped - STEERING_LEFT_LIMIT)
+                                 / (float)(STEERING_RIGHT_LIMIT - STEERING_LEFT_LIMIT);
+            lastValidSteeringAngle = steeringAngle;
+        }
 
         rearLeft = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
         rearRight = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;

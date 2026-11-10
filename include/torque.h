@@ -17,6 +17,8 @@
 #define STEERING_LEFT_LIMIT   3559U
 #define STEERING_RIGHT_LIMIT  6286U   // 2190 + 4096
 #define STEERING_WRAP_POINT   3000U   // threshold between 2579 and 3559
+#define STEERING_DEAD_GAP_LOW 2250U
+#define STEERING_DEAD_GAP_HIGH 3500U
 
 
 #define TORQUE_CONSTANT 0.32                // Nm/Arms
