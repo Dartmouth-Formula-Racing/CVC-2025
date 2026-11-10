@@ -216,7 +216,8 @@ void Torque_CommandTask(void* arguments) {
         RLFrame.data[5] = 0;
         RRFrame.data[5] = 0;
 
-        if ((driveState != NEUTRAL) && (torqueRL != 0 || torqueRR != 0)) {
+        bool holdEnabled = (DISABLE_ON_ZERO_THROTTLE == 0);
+        if ((driveState != NEUTRAL) && (holdEnabled || torqueRL != 0 || torqueRR != 0)) {
             // Enable inverters
             RLFrame.data[5] |= 0x01;  // Enable left inverter
             RRFrame.data[5] |= 0x01;  // Enable right inverter
