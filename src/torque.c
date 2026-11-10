@@ -137,12 +137,20 @@ void Torque_CalculateTask(void* arguments) {
         }
 
         // Torque Vectoring
+        // steeringAngle is scaled to [-1, +1] with +1 = left steering, -1 = right steering.
+        // Reduce the inner wheel torque and add the same amount to the outer wheel to generate
+        // a yawing moment without changing the total axle torque by more than the vectoring bias.
+        const float steeringMagnitude = (steeringAngle > 0.0f) ? steeringAngle : -steeringAngle;
         if (steeringAngle > 0.0f) {
-            rearLeft -= TORQUE_VECTORING_GAIN * steeringAngle * rearLeft;
-            frontLeft -= TORQUE_VECTORING_GAIN * steeringAngle * frontLeft;
+            rearLeft -= TORQUE_VECTORING_GAIN * steeringMagnitude * rearLeft;
+            frontLeft -= TORQUE_VECTORING_GAIN * steeringMagnitude * frontLeft;
+            rearRight += TORQUE_VECTORING_GAIN * steeringMagnitude * rearRight;
+            frontRight += TORQUE_VECTORING_GAIN * steeringMagnitude * frontRight;
         } else {
-            rearRight -= TORQUE_VECTORING_GAIN * steeringAngle * rearRight;
-            frontRight -= TORQUE_VECTORING_GAIN * steeringAngle * frontRight;
+            rearRight -= TORQUE_VECTORING_GAIN * steeringMagnitude * rearRight;
+            frontRight -= TORQUE_VECTORING_GAIN * steeringMagnitude * frontRight;
+            rearLeft += TORQUE_VECTORING_GAIN * steeringMagnitude * rearLeft;
+            frontLeft += TORQUE_VECTORING_GAIN * steeringMagnitude * frontLeft;
         }
 
         if (xSemaphoreTake(torqueDataMutex, portMAX_DELAY) == pdTRUE) {
