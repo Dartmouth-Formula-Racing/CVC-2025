@@ -74,7 +74,7 @@ static void CAN_BuildLookupTable(void) {
             if (!bucket->used) {
                 bucket->used = true;
                 bucket->key = key;
-                bucket->entry = &canData[i];
+                bucket->entry = &canData[canData[i].index];
                 break;
             }
 
