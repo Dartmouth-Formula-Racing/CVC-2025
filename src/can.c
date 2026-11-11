@@ -22,6 +22,7 @@ QueueHandle_t can2TxQueue = NULL;
 static volatile uint32_t can1TxDropCount = 0;
 static volatile uint32_t can2TxDropCount = 0;
 static volatile uint32_t canRxDropCount = 0;
+static bool canBus2ToBus1Forwarding = true;
 
 static uint8_t canRxQueueStorageArea[CAN_BUFFER_LENGTH * sizeof(CAN_Frame)];
 static StaticQueue_t canRxQueueControlBlock;
@@ -32,6 +33,26 @@ static StaticQueue_t can2TxQueueControlBlock;
 
 extern CAN_HandleTypeDef hcan1;
 extern CAN_HandleTypeDef hcan2;
+
+static void CAN_ForwardBus2ToBus1(CAN_Frame* frame) {
+    if (frame == NULL || !canBus2ToBus1Forwarding) {
+        return;
+    }
+
+    CAN_Frame bus1Frame = *frame;
+    bus1Frame.sourceBus = BUS2;
+    if (xQueueSend(can1TxQueue, &bus1Frame, pdMS_TO_TICKS(CAN_TX_QUEUE_TIMEOUT_MS)) != pdTRUE) {
+        can1TxDropCount++;
+    }
+}
+
+void CAN_SetBus2ToBus1Forwarding(bool enabled) {
+    canBus2ToBus1Forwarding = enabled;
+}
+
+bool CAN_GetBus2ToBus1Forwarding(void) {
+    return canBus2ToBus1Forwarding;
+}
 
 static StackType_t canRxTaskStack[CAN_RX_TASK_STACK_SIZE];
 static StaticTask_t canRxTaskTCB;
@@ -167,6 +188,10 @@ void CAN_RXTask(void* arguments) {
                 entryPtr->parsed = false;
                 xSemaphoreGive(canMutex);
             }
+
+            if (rxFrame.sourceBus == BUS2) {
+                CAN_ForwardBus2ToBus1(&rxFrame);
+            }
         }
     }
 }
@@ -271,11 +296,13 @@ CAN_Data_Entry* CAN_getPtrByID(uint32_t canID, uint32_t canIDE) { return CAN_get
 // CAN Receive Interrupt Handler
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    CAN_Frame rxFrame;
+    CAN_Frame rxFrame = {0};
     if (hcan->Instance == CAN1) {
         HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxFrame.header.rx, rxFrame.data);
+        rxFrame.sourceBus = BUS1;
     } else if (hcan->Instance == CAN2) {
         HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxFrame.header.rx, rxFrame.data);
+        rxFrame.sourceBus = BUS2;
     }
     rxFrame.header.rx.Timestamp = pdTICKS_TO_MS(xTaskGetTickCountFromISR());
 
@@ -286,6 +313,12 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan) {
 }
 
 void CAN_SendFrame(CAN_Bus bus, CAN_Frame* frame) {
+    if (frame == NULL) {
+        return;
+    }
+
+    frame->sourceBus = bus;
+
     if (bus == BUS1) {
         if (xQueueSend(can1TxQueue, frame, pdMS_TO_TICKS(CAN_TX_QUEUE_TIMEOUT_MS)) != pdTRUE) {
             can1TxDropCount++;
@@ -293,6 +326,10 @@ void CAN_SendFrame(CAN_Bus bus, CAN_Frame* frame) {
     } else if (bus == BUS2) {
         if (xQueueSend(can2TxQueue, frame, pdMS_TO_TICKS(CAN_TX_QUEUE_TIMEOUT_MS)) != pdTRUE) {
             can2TxDropCount++;
+        }
+
+        if (canBus2ToBus1Forwarding) {
+            CAN_ForwardBus2ToBus1(frame);
         }
     }
 }

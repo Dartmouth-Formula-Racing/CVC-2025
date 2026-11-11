@@ -124,18 +124,19 @@ typedef union {
     CAN_TxHeaderTypeDef tx;
 } CAN_Header;
 
+typedef enum {
+    BUS1,
+    BUS2,
+} CAN_Bus;
+
 typedef struct {
     CAN_Header header;
+    CAN_Bus sourceBus;
     uint8_t data[8];
 } CAN_Frame;
 
 extern CAN_Data_Entry canData[];
 extern const size_t canDataLength;
-
-typedef enum {
-    BUS1,
-    BUS2,
-} CAN_Bus;
 
 void CAN_Init(void);
 
@@ -146,6 +147,8 @@ CAN_Data_Entry CAN_getDataByID(uint32_t canID, uint32_t canIDE);
 CAN_Data_Entry* CAN_getPtrByID(uint32_t canID, uint32_t canIDE);
 
 void CAN_SendFrame(CAN_Bus bus, CAN_Frame* frame);
+void CAN_SetBus2ToBus1Forwarding(bool enabled);
+bool CAN_GetBus2ToBus1Forwarding(void);
 
 uint32_t CAN_GetBus1TxDropCount(void);
 uint32_t CAN_GetBus2TxDropCount(void);
