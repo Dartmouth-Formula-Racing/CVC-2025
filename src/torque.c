@@ -258,6 +258,10 @@ void Torque_CommandTask(void* arguments) {
 
 void Torque_LimitTask(void* arguments) {
     TickType_t lastWakeTime = xTaskGetTickCount();
+    float lastGoodMaxDischarge = 0.0f;
+    float lastGoodMaxCharge = 0.0f;
+    TickType_t lastValidVoltageTime = 0U;
+
     while (1) {
         // Cascadia CAN protocol 6.3 section 2.5
         // Limit discharge and charge current using message 0x202
@@ -267,7 +271,8 @@ void Torque_LimitTask(void* arguments) {
         // Ensure CAN_BMS_Limit_Enable_EEPROM is set to 1
         DataEntry packVoltageEntry = BMSDataGet(BMS_TOTAL_VOLTAGE);
         const TickType_t now = xTaskGetTickCount();
-        const bool voltageIsFresh = (packVoltageEntry.time != 0U) &&
+        const bool voltageHasValidTimestamp = (packVoltageEntry.time != 0U);
+        const bool voltageIsFresh = voltageHasValidTimestamp &&
                                    ((now - packVoltageEntry.time) <= pdMS_TO_TICKS(BMS_VOLTAGE_STALE_TIMEOUT_MS));
 
         float busVoltage = 0.0f;
@@ -281,6 +286,7 @@ void Torque_LimitTask(void* arguments) {
                 if (maxDischarge > INVERTER_CURRENT_LIMIT) {
                     maxDischarge = INVERTER_CURRENT_LIMIT;
                 }
+                lastValidVoltageTime = packVoltageEntry.time;
             }
         }
 
@@ -288,6 +294,29 @@ void Torque_LimitTask(void* arguments) {
             maxCharge = MAX_REGEN_CURRENT;
             if (maxCharge > INVERTER_CURRENT_LIMIT) {
                 maxCharge = INVERTER_CURRENT_LIMIT;
+            }
+        }
+
+        if (voltageIsFresh && busVoltage > 0.0f) {
+            lastGoodMaxDischarge = maxDischarge;
+            lastGoodMaxCharge = maxCharge;
+        } else if (voltageHasValidTimestamp) {
+            const TickType_t staleMs = now - packVoltageEntry.time;
+            if (staleMs <= pdMS_TO_TICKS(BMS_VOLTAGE_LIMIT_HOLD_TIMEOUT_MS)) {
+                maxDischarge = lastGoodMaxDischarge;
+                maxCharge = lastGoodMaxCharge;
+            } else {
+                maxDischarge = TORQUE_LIMIT_FAILSAFE_DISCHARGE_A;
+                maxCharge = TORQUE_LIMIT_FAILSAFE_CHARGE_A;
+            }
+        } else if (lastValidVoltageTime != 0U) {
+            const TickType_t noFreshDataMs = now - lastValidVoltageTime;
+            if (noFreshDataMs <= pdMS_TO_TICKS(BMS_VOLTAGE_LIMIT_HOLD_TIMEOUT_MS)) {
+                maxDischarge = lastGoodMaxDischarge;
+                maxCharge = lastGoodMaxCharge;
+            } else {
+                maxDischarge = TORQUE_LIMIT_FAILSAFE_DISCHARGE_A;
+                maxCharge = TORQUE_LIMIT_FAILSAFE_CHARGE_A;
             }
         }
 

@@ -15,7 +15,7 @@
 #define LEFT_MOTOR_DIRECTION_INVERTED 0U
 #define RIGHT_MOTOR_DIRECTION_INVERTED 1U
 
-#define TORQUE_VECTORING_GAIN 0.70  // Gain for torque vectoring
+#define TORQUE_VECTORING_GAIN 0.00  // Gain for torque vectoring
 #define TORQUE_VECTORING_DEADBAND 0.06f  // No vectoring effect below this normalized steering magnitude
 #define TORQUE_VECTORING_CURVE 2.0f      // Exponential ramp after deadband (2.0 = quadratic)
 // Cursed Wrapping Limits
@@ -39,6 +39,9 @@
 
 #define MAX_REGEN_CURRENT 50  // Max regenerative braking current (A)
 #define BMS_VOLTAGE_STALE_TIMEOUT_MS 1000U  // Reject pack voltage if BMS has been silent for >1 s
+#define BMS_VOLTAGE_LIMIT_HOLD_TIMEOUT_MS (3U * BMS_VOLTAGE_STALE_TIMEOUT_MS)  // Hold last valid limits for ~3 BMS periods before fail-safe
+#define TORQUE_LIMIT_FAILSAFE_DISCHARGE_A 50.0f  // Conservative non-zero discharge limit while pack voltage is unavailable
+#define TORQUE_LIMIT_FAILSAFE_CHARGE_A 25.0f    // Conservative non-zero charge limit while pack voltage is unavailable
 
 typedef struct {
     float rearLeft;
