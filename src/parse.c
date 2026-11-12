@@ -862,6 +862,8 @@ void CAN_Parse_Inverter_VoltageParameters(Inverter inverter) {
         InverterRLData[INVERTER_OUTPUT_VOLTAGE].data = (data[3] << 8) | data[2];
         InverterRLData[INVERTER_VAB_VD_VOLTAGE].data = (data[5] << 8) | data[4];
         InverterRLData[INVERTER_VAB_VQ_VOLTAGE].data = (data[7] << 8) | data[6];
+        // Timestamp lets the power limiter reject a stale DC bus voltage
+        InverterRLData[INVERTER_DC_BUS_VOLTAGE].time = xTaskGetTickCount();
         xSemaphoreGive(InverterRLDataMutex);
     } else if (inverter == RR) {
         if (canData[INVERTER_RR_VoltageParameters].parsed) {
@@ -876,6 +878,8 @@ void CAN_Parse_Inverter_VoltageParameters(Inverter inverter) {
         InverterRRData[INVERTER_OUTPUT_VOLTAGE].data = (data[3] << 8) | data[2];
         InverterRRData[INVERTER_VAB_VD_VOLTAGE].data = (data[5] << 8) | data[4];
         InverterRRData[INVERTER_VAB_VQ_VOLTAGE].data = (data[7] << 8) | data[6];
+        // Timestamp lets the power limiter reject a stale DC bus voltage
+        InverterRRData[INVERTER_DC_BUS_VOLTAGE].time = xTaskGetTickCount();
         xSemaphoreGive(InverterRRDataMutex);
     }
 }

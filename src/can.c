@@ -22,7 +22,7 @@ QueueHandle_t can2TxQueue = NULL;
 static volatile uint32_t can1TxDropCount = 0;
 static volatile uint32_t can2TxDropCount = 0;
 static volatile uint32_t canRxDropCount = 0;
-static bool canBus2ToBus1Forwarding = true;
+static bool canBus2ToBus1Forwarding = CAN_BUS2_TO_BUS1_FORWARD_DEFAULT;
 
 static uint8_t canRxQueueStorageArea[CAN_BUFFER_LENGTH * sizeof(CAN_Frame)];
 static StaticQueue_t canRxQueueControlBlock;

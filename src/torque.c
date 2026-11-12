@@ -10,6 +10,7 @@
 #include <can.h>
 #include <data.h>
 #include <misc.h>
+#include <parse.h>
 #include <semphr.h>
 #include <statemachine.h>
 #include <stdbool.h>
@@ -131,10 +132,13 @@ void Torque_CalculateTask(void* arguments) {
             lastValidSteeringAngle = steeringAngle;
         }
 
-        rearLeft = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
-        rearRight = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
-        frontLeft = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
-        frontRight = throttle * TORQUE_MAX * TORQUE_COMMAND_SCALE * 10.0;
+        // Command units are 0.1 Nm of inverter-estimated torque. 100% pedal maps to the torque the
+        // inverters can actually deliver at their Iq limit (see torque.h), so there is no dead pedal travel.
+        const float fullScale = TORQUE_CMD_FULL_SCALE_NM * 10.0f;
+        rearLeft = throttle * fullScale;
+        rearRight = throttle * fullScale;
+        frontLeft = throttle * fullScale;
+        frontRight = throttle * fullScale;
 
         if (driveState == REVERSE) {
             rearLeft *= REVERSE_TORQUE_LIMIT;
@@ -175,6 +179,12 @@ void Torque_CalculateTask(void* arguments) {
             rearLeft += vectoringGain * rearLeft;
             frontLeft += vectoringGain * frontLeft;
         }
+
+        // Vectoring adds torque to the outer wheel; never ask the inverter for more than its limit
+        rearLeft = (rearLeft > fullScale) ? fullScale : rearLeft;
+        rearRight = (rearRight > fullScale) ? fullScale : rearRight;
+        frontLeft = (frontLeft > fullScale) ? fullScale : frontLeft;
+        frontRight = (frontRight > fullScale) ? fullScale : frontRight;
 
         if (xSemaphoreTake(torqueDataMutex, portMAX_DELAY) == pdTRUE) {
             torqueRearLeft = rearLeft;
@@ -256,6 +266,75 @@ void Torque_CommandTask(void* arguments) {
     }
 }
 
+// Age of a timestamp. The timestamp can legitimately be newer than 'now' (another task parsed a frame
+// after 'now' was sampled); with unsigned math that wraps to ~49 days and looked like "stale data".
+static TickType_t Torque_AgeTicks(TickType_t now, TickType_t stamp) {
+    const int32_t delta = (int32_t)(now - stamp);
+    return (delta < 0) ? 0U : (TickType_t)delta;
+}
+
+// Freshest DC bus voltage available, in volts.
+// Preference 1: voltage measured by the inverters (message base+7, refreshed every ~30 ms) - this is the voltage the
+//               inverters regulate against, so the current limit tracks sag as it happens instead of up to 1 s late.
+// Preference 2: EMUS pack total (1 Hz).
+// Returns true if a fresh voltage was found; *sampleTime is the tick the value was parsed at.
+static bool Torque_GetBusVoltage(float* voltage, TickType_t* sampleTime) {
+    CAN_Parse_Inverter_VoltageParameters(RL);
+    CAN_Parse_Inverter_VoltageParameters(RR);
+
+    const DataEntry inverterEntries[2] = {InverterRLDataGet(INVERTER_DC_BUS_VOLTAGE), InverterRRDataGet(INVERTER_DC_BUS_VOLTAGE)};
+    const TickType_t now = xTaskGetTickCount();
+
+    bool found = false;
+    float best = 0.0f;
+    TickType_t bestTime = 0U;
+    for (size_t i = 0; i < 2U; i++) {
+        const float v = (float)inverterEntries[i].data / 10.0f;  // 0.1 V units
+        const bool fresh = (inverterEntries[i].time != 0U) &&
+                           (Torque_AgeTicks(now, inverterEntries[i].time) <= pdMS_TO_TICKS(INVERTER_VDC_STALE_TIMEOUT_MS));
+        if (fresh && v >= BUS_VOLTAGE_MIN_VALID_V && v <= 1000.0f) {
+            if (!found || v > best) {
+                best = v;  // both inverters sit on one bus; the higher reading gives the lower (safer) current limit
+            }
+            if (!found || (int32_t)(inverterEntries[i].time - bestTime) > 0) {
+                bestTime = inverterEntries[i].time;
+            }
+            found = true;
+        }
+    }
+    if (found) {
+        *voltage = best;
+        *sampleTime = bestTime;
+        return true;
+    }
+
+    CAN_Parse_EMUS_BatteryVoltageOverallParameters();
+    const DataEntry packEntry = BMSDataGet(BMS_TOTAL_VOLTAGE);
+    const TickType_t nowPack = xTaskGetTickCount();
+    const float packVolts = (float)packEntry.data / 100.0f;  // 0.01 V units
+    if (packEntry.time != 0U && packVolts >= BUS_VOLTAGE_MIN_VALID_V && packVolts <= 1000.0f &&
+        Torque_AgeTicks(nowPack, packEntry.time) <= pdMS_TO_TICKS(BMS_VOLTAGE_STALE_TIMEOUT_MS)) {
+        *voltage = packVolts;
+        *sampleTime = packEntry.time;
+        return true;
+    }
+    return false;
+}
+
+// 1.0 normally; BMS_POWER_REDUCTION_SCALE while the EMUS is asking for reduced power
+// (power-reduction output, low cell voltage warning, or high discharge current warning).
+static float Torque_BmsPowerScale(void) {
+#if BMS_DERATE_ENABLE
+    CAN_Parse_EMUS_OverallParameters();
+    CAN_Parse_EMUS_DiagnosticCodes();
+    if (BMSDataGet(BMS_POWER_REDUCTION).data != 0U || BMSDataGet(BMS_WARN_LOW_CELL_VOLTAGE).data != 0U ||
+        BMSDataGet(BMS_WARN_HIGH_DISCHARGE_CURRENT).data != 0U) {
+        return BMS_POWER_REDUCTION_SCALE;
+    }
+#endif
+    return 1.0f;
+}
+
 void Torque_LimitTask(void* arguments) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     float lastGoodMaxDischarge = 0.0f;
@@ -264,54 +343,37 @@ void Torque_LimitTask(void* arguments) {
 
     while (1) {
         // Cascadia CAN protocol 6.3 section 2.5
-        // Limit discharge and charge current using message 0x202
+        // Limit discharge and charge current using message 0x202 (one message, read by both inverters)
         // Bytes [0, 1] - Discharge current limit (A)
         // Bytes [2, 3] - Charge current limit (A)
         // Does not include traction control or torque vectoring yet, assumes even power split
         // Ensure CAN_BMS_Limit_Enable_EEPROM is set to 1
-        DataEntry packVoltageEntry = BMSDataGet(BMS_TOTAL_VOLTAGE);
-        const TickType_t now = xTaskGetTickCount();
-        const bool voltageHasValidTimestamp = (packVoltageEntry.time != 0U);
-        const bool voltageIsFresh = voltageHasValidTimestamp &&
-                                   ((now - packVoltageEntry.time) <= pdMS_TO_TICKS(BMS_VOLTAGE_STALE_TIMEOUT_MS));
-
         float busVoltage = 0.0f;
+        TickType_t voltageTime = 0U;
+        const bool voltageIsFresh = Torque_GetBusVoltage(&busVoltage, &voltageTime);
+        const TickType_t now = xTaskGetTickCount();
+
         float maxDischarge = 0.0f;
         float maxCharge = 0.0f;
 
-        if (voltageIsFresh && packVoltageEntry.data != 0U) {
-            busVoltage = (float)packVoltageEntry.data / 100.0f;
-            if (busVoltage > 0.0f) {
-                maxDischarge = (MAX_POWER * 1000.0f / busVoltage) / 2;
-                if (maxDischarge > INVERTER_CURRENT_LIMIT) {
-                    maxDischarge = INVERTER_CURRENT_LIMIT;
-                }
-                lastValidVoltageTime = packVoltageEntry.time;
+        if (voltageIsFresh) {
+            // Total DC power cap -> current per inverter at the present bus voltage
+            const float powerKw = MAX_POWER * POWER_LIMIT_MARGIN * Torque_BmsPowerScale();
+            maxDischarge = (powerKw * 1000.0f / busVoltage) / 2.0f;
+            if (maxDischarge > INVERTER_CURRENT_LIMIT) {
+                maxDischarge = INVERTER_CURRENT_LIMIT;
             }
-        }
-
-        if (voltageIsFresh && busVoltage > 0.0f) {
             maxCharge = MAX_REGEN_CURRENT;
             if (maxCharge > INVERTER_CURRENT_LIMIT) {
                 maxCharge = INVERTER_CURRENT_LIMIT;
             }
-        }
 
-        if (voltageIsFresh && busVoltage > 0.0f) {
             lastGoodMaxDischarge = maxDischarge;
             lastGoodMaxCharge = maxCharge;
-        } else if (voltageHasValidTimestamp) {
-            const TickType_t staleMs = now - packVoltageEntry.time;
-            if (staleMs <= pdMS_TO_TICKS(BMS_VOLTAGE_LIMIT_HOLD_TIMEOUT_MS)) {
-                maxDischarge = lastGoodMaxDischarge;
-                maxCharge = lastGoodMaxCharge;
-            } else {
-                maxDischarge = TORQUE_LIMIT_FAILSAFE_DISCHARGE_A;
-                maxCharge = TORQUE_LIMIT_FAILSAFE_CHARGE_A;
-            }
+            lastValidVoltageTime = voltageTime;
         } else if (lastValidVoltageTime != 0U) {
-            const TickType_t noFreshDataMs = now - lastValidVoltageTime;
-            if (noFreshDataMs <= pdMS_TO_TICKS(BMS_VOLTAGE_LIMIT_HOLD_TIMEOUT_MS)) {
+            // No fresh voltage: hold the last good limits briefly, then fall back to a conservative non-zero limit
+            if (Torque_AgeTicks(now, lastValidVoltageTime) <= pdMS_TO_TICKS(BMS_VOLTAGE_LIMIT_HOLD_TIMEOUT_MS)) {
                 maxDischarge = lastGoodMaxDischarge;
                 maxCharge = lastGoodMaxCharge;
             } else {

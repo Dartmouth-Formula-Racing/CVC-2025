@@ -38,6 +38,11 @@
 #define CAN_BROADCAST_USE_EXT 0
 #define CAN_BROADCAST_BASE_STD CAN_DASHBOARD_BASE_STD
 
+// Mirror everything seen/sent on BUS2 (inverters) onto BUS1 (logger). Required for the CL2000 to log the inverters;
+// set to 0 to take that traffic (~900 frames/s) off BUS1 when no logging is needed. Can also be toggled at runtime
+// with CAN_SetBus2ToBus1Forwarding().
+#define CAN_BUS2_TO_BUS1_FORWARD_DEFAULT 1
+
 #define CAN_SAFETYBROADCAST_INTERVAL 50  // ms
 #define CAN_BROADCAST_INTERVAL 33        // ms
 

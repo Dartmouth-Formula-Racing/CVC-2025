@@ -172,6 +172,7 @@ Brake_State Brake_GetState(void) { return brakeState; }
 void Dashboard_Broadcast_Task(void* arguments)
 {
     TickType_t lastWakeTime = xTaskGetTickCount();
+    uint32_t cycle = 0U;
 
     while (1)
     {
@@ -187,263 +188,277 @@ void Dashboard_Broadcast_Task(void* arguments)
         CAN_Parse_Inverter_Temp3TorqueShudder(RR);
 
 
-        // ---------------------------------------------------------
-        // 0x750 - Vehicle state / safety / RTD failure
-        // ---------------------------------------------------------
+        if (((cycle + DASH_PHASE_STATE) % DASH_PERIOD_STATE) == 0U) {
+            // ---------------------------------------------------------
+            // 0x750 - Vehicle state / safety / RTD failure
+            // ---------------------------------------------------------
+
+            frame.header.tx.StdId = Dashboard_STD(0);
+            frame.header.tx.IDE = CAN_ID_STD;
+            frame.header.tx.RTR = CAN_RTR_DATA;
+            frame.header.tx.DLC = 8;
+            frame.header.tx.TransmitGlobalTime = DISABLE;
 
-        frame.header.tx.StdId = Dashboard_STD(0);
-        frame.header.tx.IDE = CAN_ID_STD;
-        frame.header.tx.RTR = CAN_RTR_DATA;
-        frame.header.tx.DLC = 8;
-        frame.header.tx.TransmitGlobalTime = DISABLE;
+            frame.data[0] =
+                HAL_GPIO_ReadPin(MCU_BMS_OK_GPIO_Port,
+                                 MCU_BMS_OK_Pin) == GPIO_PIN_SET;
 
-        frame.data[0] =
-            HAL_GPIO_ReadPin(MCU_BMS_OK_GPIO_Port,
-                             MCU_BMS_OK_Pin) == GPIO_PIN_SET;
+            frame.data[1] =
+                HAL_GPIO_ReadPin(MCU_IMD_OK_GPIO_Port,
+                                 MCU_IMD_OK_Pin) == GPIO_PIN_SET;
 
-        frame.data[1] =
-            HAL_GPIO_ReadPin(MCU_IMD_OK_GPIO_Port,
-                             MCU_IMD_OK_Pin) == GPIO_PIN_SET;
+            frame.data[2] =
+                HAL_GPIO_ReadPin(MCU_BSPD_OK_GPIO_Port,
+                                 MCU_BSPD_OK_Pin) == GPIO_PIN_SET;
 
-        frame.data[2] =
-            HAL_GPIO_ReadPin(MCU_BSPD_OK_GPIO_Port,
-                             MCU_BSPD_OK_Pin) == GPIO_PIN_SET;
+            frame.data[3] =
+                HAL_GPIO_ReadPin(MCU_BSPD_Instant_GPIO_Port,
+                                 MCU_BSPD_Instant_Pin) == GPIO_PIN_SET;
 
-        frame.data[3] =
-            HAL_GPIO_ReadPin(MCU_BSPD_Instant_GPIO_Port,
-                             MCU_BSPD_Instant_Pin) == GPIO_PIN_SET;
+            frame.data[4] = (uint8_t)StateMachine_GetDriveState();
+            frame.data[5] = (uint8_t)StateMachine_GetState();
+            frame.data[6] = (uint8_t)StateMachine_GetLastFailure();
+            frame.data[7] = 0;
+
+            CAN_SendFrame(BUS1, &frame);
+        }
+
+
+        if (((cycle + DASH_PHASE_DRIVING) % DASH_PERIOD_DRIVING) == 0U) {
+            // ---------------------------------------------------------
+            // 0x751 - Driving data
+            //
+            // 0-1: average motor speed, rpm
+            // 2-3: efficiency, W/km
+            // 4-5: odometer, m
+            // 6-7: reserved
+            // ---------------------------------------------------------
+
+            frame = (CAN_Frame){0};
+
+            frame.header.tx.StdId = Dashboard_STD(1);
+            frame.header.tx.IDE = CAN_ID_STD;
+            frame.header.tx.RTR = CAN_RTR_DATA;
+            frame.header.tx.DLC = 8;
+            frame.header.tx.TransmitGlobalTime = DISABLE;
 
-        frame.data[4] = (uint8_t)StateMachine_GetDriveState();
-        frame.data[5] = (uint8_t)StateMachine_GetState();
-        frame.data[6] = (uint8_t)StateMachine_GetLastFailure();
-        frame.data[7] = 0;
+            int16_t avg_rpm = 0;
+            int16_t efficiency = 0;
+            uint16_t odometer = 0;
 
-        CAN_SendFrame(BUS1, &frame);
+            frame.data[0] = (avg_rpm >> 8) & 0xFF;
+            frame.data[1] = avg_rpm & 0xFF;
 
+            frame.data[2] = (efficiency >> 8) & 0xFF;
+            frame.data[3] = efficiency & 0xFF;
 
-        // ---------------------------------------------------------
-        // 0x751 - Driving data
-        //
-        // 0-1: average motor speed, rpm
-        // 2-3: efficiency, W/km
-        // 4-5: odometer, m
-        // 6-7: reserved
-        // ---------------------------------------------------------
+            frame.data[4] = (odometer >> 8) & 0xFF;
+            frame.data[5] = odometer & 0xFF;
 
-        frame = (CAN_Frame){0};
+            frame.data[6] = 0;
+            frame.data[7] = 0;
 
-        frame.header.tx.StdId = Dashboard_STD(1);
-        frame.header.tx.IDE = CAN_ID_STD;
-        frame.header.tx.RTR = CAN_RTR_DATA;
-        frame.header.tx.DLC = 8;
-        frame.header.tx.TransmitGlobalTime = DISABLE;
+            CAN_SendFrame(BUS1, &frame);
+        }
 
-        int16_t avg_rpm = 0;
-        int16_t efficiency = 0;
-        uint16_t odometer = 0;
 
-        frame.data[0] = (avg_rpm >> 8) & 0xFF;
-        frame.data[1] = avg_rpm & 0xFF;
+        if (((cycle + DASH_PHASE_BATTERY) % DASH_PERIOD_BATTERY) == 0U) {
+            // ---------------------------------------------------------
+            // 0x752 - Battery
+            //
+            // 0-1: pack voltage, 0.01 V
+            // 2-3: pack current, signed 0.1 A
+            // 4:   SOC, %
+            // 5:   SOH, %
+            // 6-7: reserved
+            // ---------------------------------------------------------
 
-        frame.data[2] = (efficiency >> 8) & 0xFF;
-        frame.data[3] = efficiency & 0xFF;
+            frame = (CAN_Frame){0};
 
-        frame.data[4] = (odometer >> 8) & 0xFF;
-        frame.data[5] = odometer & 0xFF;
+            frame.header.tx.StdId = Dashboard_STD(2);
+            frame.header.tx.IDE = CAN_ID_STD;
+            frame.header.tx.RTR = CAN_RTR_DATA;
+            frame.header.tx.DLC = 8;
+            frame.header.tx.TransmitGlobalTime = DISABLE;
 
-        frame.data[6] = 0;
-        frame.data[7] = 0;
+            uint32_t packVoltageRaw =
+                BMSDataGet(BMS_TOTAL_VOLTAGE).data;
 
-        CAN_SendFrame(BUS1, &frame);
+            int16_t packCurrentRaw =
+                (int16_t)BMSDataGet(BMS_CURRENT).data;
 
+            uint8_t soc =
+                (uint8_t)BMSDataGet(BMS_ESTIMATED_SOC).data;
 
-        // ---------------------------------------------------------
-        // 0x752 - Battery
-        //
-        // 0-1: pack voltage, 0.01 V
-        // 2-3: pack current, signed 0.1 A
-        // 4:   SOC, %
-        // 5:   SOH, %
-        // 6-7: reserved
-        // ---------------------------------------------------------
+            uint8_t soh =
+                (uint8_t)BMSDataGet(BMS_ESTIMATED_SOH).data;
 
-        frame = (CAN_Frame){0};
+            uint16_t packVoltage = (uint16_t)packVoltageRaw;
 
-        frame.header.tx.StdId = Dashboard_STD(2);
-        frame.header.tx.IDE = CAN_ID_STD;
-        frame.header.tx.RTR = CAN_RTR_DATA;
-        frame.header.tx.DLC = 8;
-        frame.header.tx.TransmitGlobalTime = DISABLE;
+            frame.data[0] = (packVoltage >> 8) & 0xFF;
+            frame.data[1] = packVoltage & 0xFF;
 
-        uint32_t packVoltageRaw =
-            BMSDataGet(BMS_TOTAL_VOLTAGE).data;
+            frame.data[2] = ((uint16_t)packCurrentRaw >> 8) & 0xFF;
+            frame.data[3] = (uint16_t)packCurrentRaw & 0xFF;
 
-        int16_t packCurrentRaw =
-            (int16_t)BMSDataGet(BMS_CURRENT).data;
+            frame.data[4] = soc;
+            frame.data[5] = soh;
+            frame.data[6] = 0;
+            frame.data[7] = 0;
 
-        uint8_t soc =
-            (uint8_t)BMSDataGet(BMS_ESTIMATED_SOC).data;
+            CAN_SendFrame(BUS1, &frame);
+        }
 
-        uint8_t soh =
-            (uint8_t)BMSDataGet(BMS_ESTIMATED_SOH).data;
 
-        uint16_t packVoltage = (uint16_t)packVoltageRaw;
+        if (((cycle + DASH_PHASE_TEMPS) % DASH_PERIOD_TEMPS) == 0U) {
+            // ---------------------------------------------------------
+            // 0x753 - Powertrain temperatures
+            //
+            // All temperatures are signed, 0.1 C
+            //
+            // 0-1: left motor
+            // 2-3: left inverter max module temp
+            // 4-5: right motor
+            // 6-7: right inverter max module temp
+            // ---------------------------------------------------------
 
-        frame.data[0] = (packVoltage >> 8) & 0xFF;
-        frame.data[1] = packVoltage & 0xFF;
+            frame = (CAN_Frame){0};
 
-        frame.data[2] = ((uint16_t)packCurrentRaw >> 8) & 0xFF;
-        frame.data[3] = (uint16_t)packCurrentRaw & 0xFF;
+            frame.header.tx.StdId = Dashboard_STD(3);
+            frame.header.tx.IDE = CAN_ID_STD;
+            frame.header.tx.RTR = CAN_RTR_DATA;
+            frame.header.tx.DLC = 8;
+            frame.header.tx.TransmitGlobalTime = DISABLE;
 
-        frame.data[4] = soc;
-        frame.data[5] = soh;
-        frame.data[6] = 0;
-        frame.data[7] = 0;
+            int16_t motorLeft =
+                (int16_t)InverterRLDataGet(INVERTER_MOTOR_TEMP).data;
 
-        CAN_SendFrame(BUS1, &frame);
+            int16_t motorRight =
+                (int16_t)InverterRRDataGet(INVERTER_MOTOR_TEMP).data;
 
 
-        // ---------------------------------------------------------
-        // 0x753 - Powertrain temperatures
-        //
-        // All temperatures are signed, 0.1 C
-        //
-        // 0-1: left motor
-        // 2-3: left inverter max module temp
-        // 4-5: right motor
-        // 6-7: right inverter max module temp
-        // ---------------------------------------------------------
+            int16_t invLeftA =
+                (int16_t)InverterRLDataGet(INVERTER_POWER_MODULE_A_TEMP).data;
 
-        frame = (CAN_Frame){0};
+            int16_t invLeftB =
+                (int16_t)InverterRLDataGet(INVERTER_POWER_MODULE_B_TEMP).data;
 
-        frame.header.tx.StdId = Dashboard_STD(3);
-        frame.header.tx.IDE = CAN_ID_STD;
-        frame.header.tx.RTR = CAN_RTR_DATA;
-        frame.header.tx.DLC = 8;
-        frame.header.tx.TransmitGlobalTime = DISABLE;
+            int16_t invLeftC =
+                (int16_t)InverterRLDataGet(INVERTER_POWER_MODULE_C_TEMP).data;
 
-        int16_t motorLeft =
-            (int16_t)InverterRLDataGet(INVERTER_MOTOR_TEMP).data;
 
-        int16_t motorRight =
-            (int16_t)InverterRRDataGet(INVERTER_MOTOR_TEMP).data;
+            int16_t invRightA =
+                (int16_t)InverterRRDataGet(INVERTER_POWER_MODULE_A_TEMP).data;
 
+            int16_t invRightB =
+                (int16_t)InverterRRDataGet(INVERTER_POWER_MODULE_B_TEMP).data;
 
-        int16_t invLeftA =
-            (int16_t)InverterRLDataGet(INVERTER_POWER_MODULE_A_TEMP).data;
+            int16_t invRightC =
+                (int16_t)InverterRRDataGet(INVERTER_POWER_MODULE_C_TEMP).data;
 
-        int16_t invLeftB =
-            (int16_t)InverterRLDataGet(INVERTER_POWER_MODULE_B_TEMP).data;
 
-        int16_t invLeftC =
-            (int16_t)InverterRLDataGet(INVERTER_POWER_MODULE_C_TEMP).data;
+            int16_t inverterLeft = invLeftA;
 
+            if (invLeftB > inverterLeft)
+                inverterLeft = invLeftB;
 
-        int16_t invRightA =
-            (int16_t)InverterRRDataGet(INVERTER_POWER_MODULE_A_TEMP).data;
+            if (invLeftC > inverterLeft)
+                inverterLeft = invLeftC;
 
-        int16_t invRightB =
-            (int16_t)InverterRRDataGet(INVERTER_POWER_MODULE_B_TEMP).data;
 
-        int16_t invRightC =
-            (int16_t)InverterRRDataGet(INVERTER_POWER_MODULE_C_TEMP).data;
+            int16_t inverterRight = invRightA;
 
+            if (invRightB > inverterRight)
+                inverterRight = invRightB;
 
-        int16_t inverterLeft = invLeftA;
+            if (invRightC > inverterRight)
+                inverterRight = invRightC;
 
-        if (invLeftB > inverterLeft)
-            inverterLeft = invLeftB;
 
-        if (invLeftC > inverterLeft)
-            inverterLeft = invLeftC;
+            frame.data[0] = ((uint16_t)motorLeft >> 8) & 0xFF;
+            frame.data[1] = (uint16_t)motorLeft & 0xFF;
 
+            frame.data[2] = ((uint16_t)inverterLeft >> 8) & 0xFF;
+            frame.data[3] = (uint16_t)inverterLeft & 0xFF;
 
-        int16_t inverterRight = invRightA;
+            frame.data[4] = ((uint16_t)motorRight >> 8) & 0xFF;
+            frame.data[5] = (uint16_t)motorRight & 0xFF;
 
-        if (invRightB > inverterRight)
-            inverterRight = invRightB;
+            frame.data[6] = ((uint16_t)inverterRight >> 8) & 0xFF;
+            frame.data[7] = (uint16_t)inverterRight & 0xFF;
 
-        if (invRightC > inverterRight)
-            inverterRight = invRightC;
+            CAN_SendFrame(BUS1, &frame);
+        }
 
 
-        frame.data[0] = ((uint16_t)motorLeft >> 8) & 0xFF;
-        frame.data[1] = (uint16_t)motorLeft & 0xFF;
+        if (((cycle + DASH_PHASE_AIR) % DASH_PERIOD_AIR) == 0U) {
+            // ---------------------------------------------------------
+            // 0x754 - AIR status
+            //
+            // 0 = open, 1 = closed
+            // 0: AIR1 closed status
+            // 1: AIR2 closed status
+            // 2-7: reserved
+            // ---------------------------------------------------------
 
-        frame.data[2] = ((uint16_t)inverterLeft >> 8) & 0xFF;
-        frame.data[3] = (uint16_t)inverterLeft & 0xFF;
+            frame = (CAN_Frame){0};
 
-        frame.data[4] = ((uint16_t)motorRight >> 8) & 0xFF;
-        frame.data[5] = (uint16_t)motorRight & 0xFF;
+            frame.header.tx.StdId = Dashboard_STD(4);
+            frame.header.tx.IDE = CAN_ID_STD;
+            frame.header.tx.RTR = CAN_RTR_DATA;
+            frame.header.tx.DLC = 8;
+            frame.header.tx.TransmitGlobalTime = DISABLE;
 
-        frame.data[6] = ((uint16_t)inverterRight >> 8) & 0xFF;
-        frame.data[7] = (uint16_t)inverterRight & 0xFF;
+            frame.data[0] = (uint8_t)CVCDataGet(CVC_AIR_1_STATE).data;
+            frame.data[1] = (uint8_t)CVCDataGet(CVC_AIR_2_STATE).data;
+            frame.data[2] = 0;
+            frame.data[3] = 0;
+            frame.data[4] = 0;
+            frame.data[5] = 0;
+            frame.data[6] = 0;
+            frame.data[7] = 0;
 
-        CAN_SendFrame(BUS1, &frame);
+            CAN_SendFrame(BUS1, &frame);
+        }
 
 
-        // ---------------------------------------------------------
-        // 0x754 - AIR status
-        //
-        // 0 = open, 1 = closed
-        // 0: AIR1 closed status
-        // 1: AIR2 closed status
-        // 2-7: reserved
-        // ---------------------------------------------------------
+        if (((cycle + DASH_PHASE_INPUTS) % DASH_PERIOD_INPUTS) == 0U) {
+            // ---------------------------------------------------------
+            // 0x755 - Driver inputs
+            //
+            // 0-1: throttle, 0.001 (0-1000)
+            // 2-3: steering angle, raw ADC counts
+            // 4-5: brake pressure, raw ADC counts
+            // 6-7: reserved
+            // ---------------------------------------------------------
 
-        frame = (CAN_Frame){0};
+            frame = (CAN_Frame){0};
 
-        frame.header.tx.StdId = Dashboard_STD(4);
-        frame.header.tx.IDE = CAN_ID_STD;
-        frame.header.tx.RTR = CAN_RTR_DATA;
-        frame.header.tx.DLC = 8;
-        frame.header.tx.TransmitGlobalTime = DISABLE;
+            frame.header.tx.StdId = Dashboard_STD(5);
+            frame.header.tx.IDE = CAN_ID_STD;
+            frame.header.tx.RTR = CAN_RTR_DATA;
+            frame.header.tx.DLC = 8;
+            frame.header.tx.TransmitGlobalTime = DISABLE;
 
-        frame.data[0] = (uint8_t)CVCDataGet(CVC_AIR_1_STATE).data;
-        frame.data[1] = (uint8_t)CVCDataGet(CVC_AIR_2_STATE).data;
-        frame.data[2] = 0;
-        frame.data[3] = 0;
-        frame.data[4] = 0;
-        frame.data[5] = 0;
-        frame.data[6] = 0;
-        frame.data[7] = 0;
+            uint16_t throttle =
+                (uint16_t)(Throttle_GetValue() * 1000.0f);
+            uint16_t steeringAngleRaw = Analogs_ReadChannel(Steering_Angle);
+            uint16_t brakePressureRaw = Analogs_ReadChannel(Brake_Pressure);
 
-        CAN_SendFrame(BUS1, &frame);
+            frame.data[0] = (throttle >> 8) & 0xFF;
+            frame.data[1] = throttle & 0xFF;
+            frame.data[2] = (steeringAngleRaw >> 8) & 0xFF;
+            frame.data[3] = steeringAngleRaw & 0xFF;
+            frame.data[4] = (brakePressureRaw >> 8) & 0xFF;
+            frame.data[5] = brakePressureRaw & 0xFF;
+            frame.data[6] = 0;
+            frame.data[7] = 0;
 
+            CAN_SendFrame(BUS1, &frame);
+        }
 
-        // ---------------------------------------------------------
-        // 0x755 - Driver inputs
-        //
-        // 0-1: throttle, 0.001 (0-1000)
-        // 2-3: steering angle, raw ADC counts
-        // 4-5: brake pressure, raw ADC counts
-        // 6-7: reserved
-        // ---------------------------------------------------------
 
-        frame = (CAN_Frame){0};
-
-        frame.header.tx.StdId = Dashboard_STD(5);
-        frame.header.tx.IDE = CAN_ID_STD;
-        frame.header.tx.RTR = CAN_RTR_DATA;
-        frame.header.tx.DLC = 8;
-        frame.header.tx.TransmitGlobalTime = DISABLE;
-
-        uint16_t throttle =
-            (uint16_t)(Throttle_GetValue() * 1000.0f);
-        uint16_t steeringAngleRaw = Analogs_ReadChannel(Steering_Angle);
-        uint16_t brakePressureRaw = Analogs_ReadChannel(Brake_Pressure);
-
-        frame.data[0] = (throttle >> 8) & 0xFF;
-        frame.data[1] = throttle & 0xFF;
-        frame.data[2] = (steeringAngleRaw >> 8) & 0xFF;
-        frame.data[3] = steeringAngleRaw & 0xFF;
-        frame.data[4] = (brakePressureRaw >> 8) & 0xFF;
-        frame.data[5] = brakePressureRaw & 0xFF;
-        frame.data[6] = 0;
-        frame.data[7] = 0;
-
-        CAN_SendFrame(BUS1, &frame);
-
+        cycle++;
 
         vTaskDelayUntil(
             &lastWakeTime,
